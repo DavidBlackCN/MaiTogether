@@ -1,0 +1,158 @@
+--- a/_manifest.json
++++ b/_manifest.json
+@@ -41,7 +41,8 @@
+     "chat.open_session",
+     "component.disable",
+     "component.enable",
+-    "message.get_by_id"
++    "message.get_by_id",
++    "behavior.check"
+   ],
+   "i18n": {
+     "default_locale": "zh-CN",
+--- a/plugin.py
++++ b/plugin.py
+@@ -910,6 +910,11 @@
+         except Exception as exc:
+             return {"success": False, "error": str(exc)}
+ 
++        try:
++            await runtime_bundle.transport.behavior_gate.preflight_batch(
++                actions, runtime_bundle.transport.connection_generation)
++        except Exception as exc:
++            return {"success": False, "error": str(exc), "metadata": {"behavior_state": "not_submitted"}}
+         responses: List[Mapping[str, Any]] = []
+         for action_name, params in actions:
+             if debug_logger is not None:
+@@ -917,7 +922,9 @@
+             try:
+                 response = await runtime_bundle.action_service.call_action(action_name, params)
+             except Exception as exc:
+-                return {"success": False, "error": str(exc), "metadata": {"action": action_name}}
++                return {"success": False, "error": str(exc), "metadata": {"action": action_name,
++                    "behavior_state": "partial" if responses else getattr(exc, "state", "unknown"),
++                    "completed_count": len(responses)}}
+             if not self._is_action_response_ok(response):
+                 return {
+                     "success": False,
+@@ -1004,6 +1011,9 @@
+                 profile_state=profile_state,
+                 load_settings=self._load_settings,
+             )
++            from .services.behavior_policy import BehaviorGate
++            self._runtime_bundle.transport.behavior_gate = BehaviorGate(self.ctx, self._runtime_bundle)
++            self._runtime_bundle.runtime_state.behavior_connection = lambda: self._runtime_bundle.transport.connection_generation
+             self._runtime_bundle.transport.configure(settings.client, profile_state)
+             self._event_router.bind_runtime(self._runtime_bundle)
+             self._bind_runtime_aliases(self._runtime_bundle)
+--- a/runtime_state.py
++++ b/runtime_state.py
+@@ -47,6 +47,7 @@
+         self._reported_scope: Optional[str] = None
+         self.detected_protocol: Optional[str] = None
+         self._reported_protocol: Optional[str] = None
++        self.behavior_connection = lambda: ""
+ 
+     @property
+     def account_id(self) -> Optional[str]:
+@@ -97,6 +98,8 @@
+                 metadata={
+                     "ws_url": server_config.build_ws_url(),
+                     "protocol": self.detected_protocol,
++                    "behavior_contract": 1,
++                    "behavior_connection": self.behavior_connection(),
+                 },
+             )
+         except Exception as exc:
+--- a/services/action_service.py
++++ b/services/action_service.py
+@@ -54,12 +54,28 @@
+         except asyncio.CancelledError:
+             raise
+         except Exception as exc:
++            from .behavior_policy import BehaviorDenied
++            if isinstance(exc, BehaviorDenied):
++                raise
+             raise RuntimeError(f"对端动作执行失败: action={action_name} error={exc}") from exc
+ 
++        from .behavior_policy import BehaviorDenied
++        ticket = response.pop("_behavior_ticket", None)
++        gate = self._transport.behavior_gate
+         if str(response.get("status") or "").lower() != "ok" or response.get("retcode", 0) != 0:
+-            error_message = str(response.get("wording") or response.get("message") or "unknown")
+-            raise RuntimeError(f"对端动作返回失败: action={action_name} message={error_message}")
+-        await self._confirm_group_delivery(action_name, normalized_params, response)
++            if ticket:
++                await gate.result(ticket, "failed")
++            raise BehaviorDenied(f"对端动作返回失败: action={action_name}", "failed")
++        try:
++            await self._confirm_group_delivery(action_name, normalized_params, response)
++        except BaseException as exc:
++            if ticket:
++                await gate.result(ticket, "unknown")
++            if isinstance(exc, asyncio.CancelledError):
++                raise
++            raise BehaviorDenied(f"群消息投递未确认: action={action_name}", "unknown") from exc
++        if ticket:
++            await gate.result(ticket, "confirmed")
+         return response
+ 
+     async def _confirm_group_delivery(
+--- a/transport.py
++++ b/transport.py
+@@ -65,6 +65,8 @@
+         self._pending_actions: Dict[str, asyncio.Future[Dict[str, Any]]] = {}
+         self._background_tasks: Set[asyncio.Task[Any]] = set()
+         self._send_lock = asyncio.Lock()
++        self.behavior_gate = None
++        self.connection_generation = uuid4().hex
+         self._ws: Optional[AiohttpClientWebSocketResponse] = None
+         self._stop_requested: bool = False
+         self._connection_active: bool = False
+@@ -181,11 +183,37 @@
+         response_future: asyncio.Future[Dict[str, Any]] = loop.create_future()
+         self._pending_actions[echo_id] = response_future
+ 
++        from copy import deepcopy
++        from .services.behavior_policy import BehaviorDenied
++        params = deepcopy(params)
+         request_payload = {"action": action_name, "params": params, "echo": echo_id}
++        gate = self.behavior_gate
++        ticket = None
++        submitted = False
+         try:
++            if gate is None:
++                raise BehaviorDenied("BEHAVIOR_GATE_UNAVAILABLE")
++            ticket = await gate.prepare(action_name, params, self.connection_generation)
+             async with self._send_lock:
++                if ws is not self._ws or ws.closed:
++                    raise BehaviorDenied("BEHAVIOR_CONNECTION_CHANGED", "not_submitted")
++                await gate.final(ticket, action_name, params, self.connection_generation)
++                submitted = True  # send_str can fail after writing a prefix; conservatively unknown.
+                 await ws.send_str(json.dumps(request_payload, ensure_ascii=False))
+-            return await asyncio.wait_for(response_future, timeout=server_config.action_timeout_sec)
++            await gate.result(ticket, "submitted")
++            response = await asyncio.wait_for(response_future, timeout=server_config.action_timeout_sec)
++            if response.get("status") != "ok":
++                await gate.result(ticket, "failed")
++            if ticket.get("reference"):
++                response["_behavior_ticket"] = ticket
++            return response
++        except BaseException as exc:
++            if ticket is not None:
++                await gate.result(ticket, "unknown" if submitted else "not_submitted")
++            if isinstance(exc, (asyncio.CancelledError, BehaviorDenied)):
++                raise
++            raise BehaviorDenied("BEHAVIOR_TRANSPORT_" + type(exc).__name__,
++                                 "unknown" if submitted else "not_submitted") from exc
+         finally:
+             self._pending_actions.pop(echo_id, None)
+ 
+@@ -207,6 +235,7 @@
+             try:
+                 async with ClientSession(headers=self._build_headers(server_config), timeout=timeout) as session:
+                     async with session.ws_connect(ws_url, heartbeat=server_config.heartbeat_interval or None) as ws:
++                        self.connection_generation = uuid4().hex
+                         self._ws = ws
+                         self._logger.info(f"适配器已连接: {display_url}")
+                         disconnect_reason = await self._receive_loop(ws)

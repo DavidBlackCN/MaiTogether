@@ -1,0 +1,19 @@
+{
+  "adaptation_version": "0.1.1",
+  "contract_version": 1,
+  "host": {
+    "commit": "c6429547af711555e3d4d1b8d04b413572cb616c",
+    "tag": "v1.3.19",
+    "repository": "https://github.com/Mai-with-u/MaiBot"
+  },
+  "sdk": {
+    "commit": "aa9ab7b347f9d011a3e0b00addee46de8f16bf9e",
+    "tag": "v2.21.0",
+    "repository": "https://github.com/Mai-with-u/maibot-plugin-sdk"
+  },
+  "adapter": {
+    "commit": "9b409b1920291f5f12f31c68b0b41604ea40a78a",
+    "tag": "v1.1.13",
+    "repository": "https://github.com/Mai-with-u/MaiBot-SnowLuma-Adapter"
+  }
+}
