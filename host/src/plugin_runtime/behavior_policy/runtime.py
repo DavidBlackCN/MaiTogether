@@ -11,7 +11,8 @@ import secrets
 import time
 
 from .actions import MESSAGE_TARGET, category, fingerprint, text_digest
-from .context import contexts, current, outbound, provider_request
+from .context import contexts, current, outbound, provider_request, live
+from .build_features import FEATURES
 
 ADAPTER = 'maibot-team.snowluma-adapter'
 PROVIDERS = {
@@ -66,6 +67,14 @@ class BehaviorPolicy:
     def target(self, route):
         return next((item for item in self.targets if route_matches(item, route)), None)
 
+    @property
+    def behavior_enabled(self):
+        return self.enabled and 'behavior' in FEATURES
+
+    @property
+    def sleep_enabled(self):
+        return self.enabled and 'sleep' in FEATURES
+
     def check_origin(self, origin, stream, target):
         if origin.get('kind') == 'background' and origin.get('plugin') not in target.get('autonomous_plugins', []):
             raise PermissionError('BEHAVIOR_BACKGROUND_TARGET_DENIED')
@@ -74,11 +83,11 @@ class BehaviorPolicy:
             raise PermissionError('BEHAVIOR_CROSS_TARGET_DENIED')
 
     def delegates(self, message):
-        return self.enabled and isinstance(message, dict) and self.target(route_from_message(message)) is not None
+        return self.behavior_enabled and isinstance(message, dict) and self.target(route_from_message(message)) is not None
 
     def control_for(self, method, args):
         request = provider_request.get()
-        return {'version': 1, 'enabled': self.enabled,
+        return {'version': 1, 'enabled': self.behavior_enabled,
                 'defer_send_guard': method == 'plugin.invoke_hook'
                     and args.get('hook_name') == 'send_service.before_send' and self.delegates(args.get('message')),
                 'request': request}
@@ -154,12 +163,12 @@ class BehaviorPolicy:
             logging.getLogger('behavior_control').info('%s', json.dumps(event, ensure_ascii=False))
         return dict(allowed=state == 'permitted', state=state, reason=reason, action_id=entry['id'])
 
-    async def prepare(self, plugin, args):
+    async def prepare(self, plugin, args, *, allocate=True):
         if plugin != ADAPTER:
             raise PermissionError('BEHAVIOR_ADAPTER_ONLY')
         name = args.get('action', '')
         kind = category(name)
-        if not self.enabled or kind == 'read':
+        if not self.behavior_enabled or kind == 'read':
             return {'allowed': True, 'reference': '', 'state': 'not_submitted'}
         if kind == 'unknown':
             return {'allowed': False, 'state': 'denied', 'reason': 'BEHAVIOR_ACTION_UNCLASSIFIED'}
@@ -185,6 +194,9 @@ class BehaviorPolicy:
                     and m.get('component') == origin.get('component') and name in m.get('actions', [])
                     for m in self.management)):
             return {'allowed': False, 'state': 'denied', 'reason': 'BEHAVIOR_MANAGEMENT_DENIED'}
+        if not allocate:
+            # Classification/route/authority validation must not reserve tickets or quotas.
+            return {'allowed': True, 'reference': '', 'state': 'not_submitted'}
         now = time.monotonic()
         self.actions = {k: v for k, v in self.actions.items() if now < v['expires']}
         if len(self.actions) >= 8192:
@@ -195,7 +207,8 @@ class BehaviorPolicy:
             route=route, stream_id=stream, category=kind, action=name, origin=origin,
             connection=args.get('connection'), digest=args.get('digest'), text_digest=args.get('text_digest', ''),
             message_id=output.get('message_id', ''), state='prepared', expires=now+120,
-            providers=target['providers'] if target else [], results=invocation.results if invocation else [])
+            providers=target['providers'] if target else [], results=invocation.results if invocation else [],
+            authority=invocation if kind == 'management' else None)
         return {'allowed': True, 'reference': reference, 'state': 'not_submitted'}
 
     async def final(self, plugin, args):
@@ -208,6 +221,9 @@ class BehaviorPolicy:
         entry['state'] = 'checking'
         entry['checking_at'] = time.monotonic()
         entry['provider_calls'] = 0
+        if entry['category'] == 'management' and (entry['authority'] is None
+                or not live(entry['authority'], time.monotonic())):
+            return self._record(entry, 'denied', 'BEHAVIOR_AUTHORITY_EXPIRED')
         request = {k: entry[k] for k in ('id', 'route', 'stream_id', 'category', 'action', 'origin',
                                         'text_digest', 'message_id')}
         try:
@@ -225,12 +241,16 @@ class BehaviorPolicy:
             raise
         except Exception as exc:
             return self._record(entry, 'denied', type(exc).__name__ + ':' + str(exc)[:160])
+        if entry['category'] == 'management' and not live(entry['authority'], time.monotonic()):
+            return self._record(entry, 'denied', 'BEHAVIOR_AUTHORITY_EXPIRED')
         return self._record(entry, 'permitted')
 
     async def capability(self, plugin, capability, args):
         if plugin != ADAPTER:
             raise PermissionError('BEHAVIOR_ADAPTER_ONLY')
         phase = args.get('phase')
+        if phase == 'preflight':
+            return await self.prepare(plugin, args, allocate=False)
         if phase == 'prepare':
             return await self.prepare(plugin, args)
         if phase == 'final':
@@ -254,7 +274,7 @@ class BehaviorPolicy:
 
     async def platform_check(self, message, route_key, driver):
         """Non-QQ final gate; patched QQ performs the check on its concrete leaf actions."""
-        if not self.enabled:
+        if not self.behavior_enabled:
             return
         from src.plugin_runtime.host.message_utils import PluginMessageUtils
         data = PluginMessageUtils._session_message_to_dict(message, include_binary_data=False)

@@ -20,7 +20,7 @@ class BehaviorGate:
         return await self.ctx.call_host_method('cap.call', payload={
             'capability': 'behavior.check', 'args': {'phase': phase, **args}}, timeout_ms=2000)
 
-    async def prepare(self, name, params, connection):
+    async def prepare(self, name, params, connection, *, preflight=False):
         kind = category(name)
         if kind == 'read':
             return {'reference': '', 'connection': connection}
@@ -61,7 +61,7 @@ class BehaviorGate:
         route = dict(platform='qq', account_id=state.account_id, scope=state.scope,
                      chat_type='group' if group else 'private', target_id=str(group or user or ''))
         digest = fingerprint({'action': name, 'params': params})
-        result = await self.rpc('prepare', action=name, route=route, connection=connection,
+        result = await self.rpc('preflight' if preflight else 'prepare', action=name, route=route, connection=connection,
                                 digest=digest, text_digest=text_digest(params))
         if not result.get('allowed'):
             raise BehaviorDenied(result.get('reason', 'BEHAVIOR_DENIED'))
@@ -89,4 +89,4 @@ class BehaviorGate:
     async def preflight_batch(self, actions, connection):
         # Resolve every target/classification before the first visible action.
         for name, params in actions:
-            await self.prepare(name, deepcopy(params), connection)
+            await self.prepare(name, deepcopy(params), connection, preflight=True)

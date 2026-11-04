@@ -24,7 +24,9 @@ def main():
     archive=out.with_name(out.name+'.zip')
     if out.exists() or archive.exists():raise ValueError('Delivery output must not exist')
     out.mkdir(parents=True)
-    for kind,folder in [('host','Host-1.3.19'),('adapter','QQ-Adapter-1.1.13')]:
+    baseline=json.loads((CONTROL/'baseline.json').read_text(encoding='utf-8'))
+    for kind,prefix in [('host','Host'),('adapter','QQ-Adapter')]:
+        folder=prefix+'-'+baseline[kind]['tag'].removeprefix('v')
         build(root/'.implementation/vendor'/folder,kind,out/kind)
     pins={}
     for folder in ('maibot-maiIdentity-plugin','maibot-maihush-plugin','maibot-maivita-plugin'):
@@ -37,13 +39,14 @@ def main():
     source=root/'maibot-maivita-plugin/ecosystem/coordinator'
     names=[f.relative_to(source).as_posix() for f in source.rglob('*') if f.is_file()]
     copy_files(source,out/'plugins/maibot-maicoordinate-plugin',names)
-    pins['maibot-maicoordinate-plugin']={'version':'0.4.1','included_in':pins['maibot-maivita-plugin']['commit']}
+    pins['maibot-maicoordinate-plugin']={'version':json.loads((source/'_manifest.json').read_text(encoding='utf-8'))['version'],
+                                       'included_in':pins['maibot-maivita-plugin']['commit']}
     shutil.copytree(CONTROL,out/'maintenance',ignore=shutil.ignore_patterns('__pycache__','*.pyc','.git','.pytest_cache'))
     (out/'core-versions.json').write_text(json.dumps(pins,indent=2)+'\n',encoding='utf-8')
     version=json.loads((CONTROL/'baseline.json').read_text(encoding='utf-8'))['adaptation_version']
     (out/'README.md').write_text(f'# MaiTogether {version}\n\n'
-        '`host/` 为组装后的 Host 1.3.19；将 `plugins/` 的四个插件及 `adapter/` 连接器安装到 Host 的插件目录，同一插件仅保留一份。\n\n'
-        '依赖、配置、测试和回滚说明见 [维护说明](maintenance/README.md)。SDK 固定为 2.21.0，详见 maintenance/baseline.json。\n\n'
+        f'`host/` 为组装后的 Host {baseline["host"]["tag"]}；将 `plugins/` 的四个插件及 `adapter/` 连接器安装到 Host 的插件目录，同一插件仅保留一份。\n\n'
+        f'依赖、配置、测试和回滚说明见 [维护说明](maintenance/README.md)。SDK 固定为 {baseline["sdk"]["tag"]}，详见 maintenance/baseline.json。\n\n'
         '本包不含运行配置、账号、数据库、日志或虚拟环境。启用前填写完整目标与受管范围；真实 QQ、SnowLuma 和 Linux 服务器仍须验收。\n',encoding='utf-8')
     manifest=hashes(out)
     (out/'SHA256SUMS.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')

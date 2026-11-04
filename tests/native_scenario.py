@@ -260,10 +260,12 @@ async def run(work):
             {'type':'file','data':{'file_ref':'fixture','name':'test.txt','url':'http://127.0.0.1/test.txt'}},
             {'type':'text','data':{'text':'after'}}]
         before=len(writes); audit_before=len(get_policy().audit)
+        tickets_before=set(get_policy().actions)
         assert (await gateway(mixed))['success']
         assert [w['action'] for w in writes[before:]]==['send_msg','upload_group_file','send_msg']
         permitted=[a for a in list(get_policy().audit)[audit_before:] if a['state']=='permitted']
         assert len(permitted)==3 and all(a['provider_calls']==2 for a in permitted)
+        assert len(set(get_policy().actions)-tickets_before)==3, 'batch preflight leaked tickets'
         cases.append('mixed_text_file_gateway_three_leaf_checks')
         before=len(writes); faults['drop']='upload_group_file'
         result=await gateway(mixed); faults['drop']=None

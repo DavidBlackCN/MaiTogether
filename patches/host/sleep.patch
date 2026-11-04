@@ -1,0 +1,282 @@
+--- a/src/A_memorix/core/utils/summary_importer.py
++++ b/src/A_memorix/core/utils/summary_importer.py
+@@ -798,6 +798,10 @@
+                 limit_mode="latest",
+             )
+ 
++            from src.plugin_runtime.behavior_policy.sleep_guard import record_only, pause_reason
++            if await pause_reason(stream_id):
++                return SummaryImportResult(False, "生活状态暂停自动总结")
++            messages = [message for message in messages if not record_only(message)]
+             if not messages:
+                 return SummaryImportResult(False, "未找到有效的聊天记录进行总结")
+ 
+--- a/src/chat/heart_flow/heartflow_message_processor.py
++++ b/src/chat/heart_flow/heartflow_message_processor.py
+@@ -51,6 +51,11 @@
+             # message.is_mentioned = is_mentioned
+             # message.is_at = is_at
+ 
++            from src.plugin_runtime.behavior_policy.sleep_guard import mark_incoming
++            if await mark_incoming(message):
++                await MessageUtils.store_message_to_db_async(message)
++                return
++
+             chat = None
+             try:
+                 chat = await heartflow_manager.get_or_create_heartflow_chat(message.session_id)
+--- a/src/chat/replyer/maisaka_generator_base.py
++++ b/src/chat/replyer/maisaka_generator_base.py
+@@ -1057,6 +1057,10 @@
+         #     f"历史条数={len(chat_history)} 目标ID={reply_message.message_id if reply_message else None}"
+         # )
+ 
++        from src.plugin_runtime.behavior_policy.sleep_guard import pause_reason
++        if reason := await pause_reason(stream_id or ""):
++            result.error_message = "生活状态暂停生成：" + reason
++            return finalize(False)
+         filtered_history = [message for message in chat_history if self._should_keep_replyer_history_message(message)]
+ 
+         try:
+@@ -1236,6 +1240,9 @@
+                         session_id=preview_chat_id,
+                     )
+                 generation_options = self._build_generation_options(active_model_name)
++                if reason := await pause_reason(stream_id or ""):
++                    result.error_message = "生活状态暂停生成：" + reason
++                    return finalize(False)
+                 generation_result = await active_model.generate_response_with_context(
+                     context_factory=context_factory,
+                     options=generation_options,
+@@ -1257,6 +1264,9 @@
+                         f"session={preview_chat_id} model={continuation_model_name or 'unknown'} "
+                         f"reasoning={self._normalize_content(continuation_reasoning, limit=300)!r}"
+                     )
++                    if reason := await pause_reason(stream_id or ""):
++                        result.error_message = "生活状态暂停续写：" + reason
++                        return finalize(False)
+                     generation_result, request_messages = await self._continue_reasoning_only_response(
+                         active_model=active_model,
+                         request_messages=request_messages,
+--- a/src/maisaka/builtin_tool/reply.py
++++ b/src/maisaka/builtin_tool/reply.py
+@@ -385,6 +385,10 @@
+     return await execute_reply(tool_ctx, invocation_arguments, call_id=invocation.call_id)
+ 
+ 
++from src.plugin_runtime.behavior_policy.cognition_hooks import reply_guard
++
++
++@reply_guard
+ async def execute_reply(
+     tool_ctx: BuiltinToolRuntimeContext,
+     arguments: Dict[str, Any],
+--- a/src/maisaka/chat_loop_service.py
++++ b/src/maisaka/chat_loop_service.py
+@@ -1154,6 +1154,10 @@
+                     f"请求上下文中的 function call 缺少前置 user/function output 锚点: call_id={item.tool_call.call_id}"
+                 )
+ 
++    async def _check_life_state(self) -> None:
++        from src.plugin_runtime.behavior_policy.cognition_hooks import check_planner
++        await check_planner(self)
++
+     async def chat_loop_step(
+         self,
+         chat_history: List[LLMContextMessage],
+@@ -1176,6 +1180,7 @@
+             ChatResponse: 本轮规划器返回结果。
+         """
+ 
++        await self._check_life_state()
+         enable_visual_message = self._resolve_enable_visual_message(request_kind)
+         # 拼图仅在调用工具时追加；不因后续图片增加而替换历史图片、破坏 KV 缓存前缀。
+         preserved_image_item_ids = {
+@@ -1306,6 +1311,7 @@
+         prompt_section: RenderableType | None = None
+         prompt_html_uri: str | None = None
+ 
++        await self._check_life_state()
+         llm_started_at = time.perf_counter()
+         external_planner = (
+             request_kind == "planner"
+--- a/src/maisaka/focus/group_runtime.py
++++ b/src/maisaka/focus/group_runtime.py
+@@ -84,6 +84,7 @@
+         self._planner_started_at = 0.0
+         self._planner_ended_at = 0.0
+         self._service = FocusChatLoopService(is_group_chat=True)
++        self._service.cognition_members = self.members
+         self.tools = FocusToolRouter(self)
+         self._store = FocusCheckpointStore(scope_id)
+         self._checkpoint_lock = asyncio.Lock()
+@@ -482,7 +483,8 @@
+                     await self._event.wait()
+                     continue
+                 self._take_ready_inputs()
+-                await self._run_turn()
++                from src.plugin_runtime.behavior_policy.cognition_hooks import run_focus_turn
++                await run_focus_turn(self)
+         except asyncio.CancelledError:
+             raise
+         except Exception:
+@@ -498,6 +500,7 @@
+         for _ in range(MAX_INTERNAL_ROUNDS):
+             if self._closed or self._wait_until is not None:
+                 return
++            await self._service._check_life_state()
+             self._take_ready_inputs()
+             await self._compact()
+             await self.tools.refresh()
+@@ -696,7 +699,7 @@
+                 item["tool_args"] = dict(call.args)
+             monitor.append(item)
+             await self.checkpoint()
+-            if result.success and (result.metadata.get("pause_execution") or result.stop_after_execution):
++            if (result.success and result.metadata.get("pause_execution")) or result.stop_after_execution:
+                 paused = True
+             next_call = (
+                 response.tool_calls[index + 1].call_id if index + 1 < len(response.tool_calls) and not paused else ""
+--- a/src/maisaka/reasoning_engine.py
++++ b/src/maisaka/reasoning_engine.py
+@@ -84,6 +84,8 @@
+ from src.maisaka.memory.heuristic_injector import heuristic_memory_injector
+ from src.maisaka.memory.image_injector import image_memory_injector
+ from src.maisaka.monitor.tool_media import build_tool_result_images
++from src.plugin_runtime.behavior_policy.sleep_guard import CognitionPaused, record_only
++from src.plugin_runtime.behavior_policy.cognition_hooks import pause_turn
+ from src.maisaka.context.compaction import ContextSummaryMessage, build_context_summary
+ from src.maisaka.monitor.events import (
+     emit_flow_step,
+@@ -937,6 +939,8 @@
+         try:
+             while self._runtime._running:
+                 queued_trigger = await self._runtime._internal_turn_queue.get()
++                if await pause_turn(self._runtime, queued=True):
++                    continue
+                 turn_start_context = await self._prepare_turn_start_context(queued_trigger)
+                 if turn_start_context.trigger_message is None:
+                     continue
+@@ -960,6 +964,8 @@
+                         logger.info(f"{self._runtime.log_prefix} {force_continue_reason}")
+                     round_index = 0
+                     while round_index < self._runtime._max_internal_rounds:
++                        if await pause_turn(self._runtime):
++                            break
+                         # 工具执行或整理上下文期间收到的消息，在下一次模型请求前补齐。
+                         pending_round_messages = await self._ingest_pending_messages() if round_index > 0 else []
+                         if pending_round_messages:
+@@ -995,6 +1001,9 @@
+                             if should_break_after_action:
+                                 break
+                             continue
++                        except CognitionPaused as exc:
++                            state.cycle_end = CycleEnd("sleep_paused", str(exc))
++                            break
+                         except ReqAbortException as exc:
+                             state.planner_interrupted = True
+                             state.cycle_end = CycleEnd("planner_interrupted", "Planner 被新消息打断，当前轮结束。")
+@@ -1153,6 +1162,8 @@
+     ) -> Optional[LLMContextMessage]:
+         """根据真实消息构造对应的上下文消息。"""
+ 
++        if record_only(message):
++            return None
+         source_sequence = message.raw_message
+         visible_text = self._build_legacy_visible_text(message, source_sequence, source_kind=source_kind)
+         include_chat_id = self._runtime._is_focus_mode_active_for_current_chat()
+@@ -1308,6 +1319,9 @@
+         consume_references: bool = True,
+     ) -> None:
+         """生成滚动状态后提交裁切；压缩失败也丢弃本批旧原文，继续处理近期消息。"""
++        from src.plugin_runtime.behavior_policy.sleep_guard import pause_reason
++        if enable_compaction and await pause_reason(self._runtime.session_id):
++            enable_compaction = False
+         original_history = list(self._runtime._chat_history)
+         process_result = process_chat_history_after_cycle(
+             self._runtime._chat_history,
+@@ -2171,9 +2185,9 @@
+             await self._emit_planner_progress(cycle_detail, state, tool_monitor_results, next_call_id)
+ 
+             if not result.success and tool_call.func_name == "reply":
+-                logger.warning(f"{self._runtime.log_prefix} 回复工具未生成可见消息，将继续下一轮循环")
+-
+-            if result.success and result.stop_after_execution:
++                logger.info(f"{self._runtime.log_prefix} 回复未确认发送，本轮结束")
++
++            if result.stop_after_execution:
+                 should_stop_after_execution = True
+ 
+             if bool(result.metadata.get("pause_execution", False)):
+--- a/src/maisaka/runtime.py
++++ b/src/maisaka/runtime.py
+@@ -1006,6 +1006,9 @@
+ 
+     async def register_message(self, message: SessionMessage) -> None:
+         """缓存一条新消息并唤醒主循环。"""
++        from src.plugin_runtime.behavior_policy.sleep_guard import record_only, pause_reason
++        if record_only(message) or await pause_reason(self.session_id):
++            return
+         await focus_mode_manager.reconcile(self)
+         async with self._message_ingest_lock:
+             if not self._running:
+--- a/src/services/memory_flow_service.py
++++ b/src/services/memory_flow_service.py
+@@ -28,6 +28,9 @@
+ from .person_fact_reverification import reclassify_historical_person_facts
+ 
+ logger = get_logger("memory_flow_service")
++
++
++from src.plugin_runtime.behavior_policy.cognition_hooks import memory_guard
+ 
+ 
+ @dataclass
+@@ -137,6 +140,7 @@
+         except asyncio.CancelledError:
+             raise
+ 
++    @memory_guard()
+     async def _handle_message(self, message: Any) -> None:
+         reply_text = str(getattr(message, "processed_plain_text", "") or "").strip()
+         if not reply_text:
+@@ -317,6 +321,9 @@
+         filtered: List[Any] = []
+         target_person_id = str(getattr(person, "person_id", "") or "").strip()
+         for item in messages:
++            from src.plugin_runtime.behavior_policy.sleep_guard import record_only
++            if record_only(item):
++                continue
+             platform = str(getattr(item, "platform", "") or "").strip()
+             user_info = getattr(getattr(item, "message_info", None), "user_info", None)
+             user_id = str(getattr(user_info, "user_id", "") or getattr(item, "user_id", "") or "").strip()
+@@ -556,6 +563,7 @@
+         except asyncio.CancelledError:
+             raise
+ 
++    @memory_guard()
+     async def _handle_message(self, message: Any) -> None:
+         session_id = self._resolve_session_id(message)
+         if not session_id:
+@@ -929,6 +937,7 @@
+         parts = [component.text.strip() for component in components if isinstance(component, TextComponent)]
+         return " ".join(part for part in parts if part)
+ 
++    @memory_guard(False)
+     async def _handle_message(self, message: Any, *, component_paths: Optional[List[str]] = None) -> bool:
+         raw_message = message.raw_message
+         components = raw_message.components
+@@ -1014,11 +1023,13 @@
+         await self.fact_writeback.shutdown()
+         self._started = False
+ 
++    @memory_guard()
+     async def on_incoming_message(self, message: Any) -> None:
+         if not self._started:
+             await self.start()
+         await self._run_message_tasks(self._observe_sender_identity(message), self.image_writeback.enqueue(message))
+ 
++    @memory_guard()
+     async def on_message_sent(self, message: Any) -> None:
+         if not self._started:
+             await self.start()

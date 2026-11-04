@@ -2,10 +2,11 @@ from pathlib import Path
 from types import SimpleNamespace
 import asyncio
 import sys
+import os
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'maibot'))
+sys.path.insert(0, os.environ.get('MAITOGETHER_TEST_HOST', str(Path(__file__).resolve().parents[1] / 'host')))
 from src.plugin_runtime.behavior_policy.context import Contexts, Invocation, current, runner_scope, runner_reference
 from src.plugin_runtime.behavior_policy.runtime import ADAPTER, BehaviorPolicy
 

@@ -8,17 +8,18 @@ import shutil
 import subprocess
 import sys
 import time
+import importlib.metadata
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTROL = Path(__file__).resolve().parents[1]
 
 
-def stage(work, adapter_source):
-    sources = {name: ROOT / name for name in ('maibot-maivita-plugin', 'maibot-maihush-plugin',
+def stage(work, adapter_source, workspace, pins):
+    sources = {name: workspace / name for name in ('maibot-maivita-plugin', 'maibot-maihush-plugin',
                 'maibot-maiIdentity-plugin', 'maibot-maicoordinate-plugin')}
     sources.update(adapter=adapter_source,
-                   poke=ROOT / '.implementation/vendor/smart_poke_plugin',
-                   cateye=ROOT / '.implementation/vendor/Cateye-audit')
+                   poke=workspace / '.implementation/vendor/smart_poke_plugin',
+                   cateye=workspace / '.implementation/vendor/Cateye-audit')
     evidence = {}
     for name, source in sources.items():
         target = work / 'plugins' / name
@@ -40,8 +41,8 @@ def stage(work, adapter_source):
         name='Behavior probe', version='1.0.0', description='Isolated fixture', author={'name':'test','url':'https://example.invalid'},
         license='MIT', urls={'repository':'https://example.invalid/test'},
         i18n={'default_locale':'zh-CN','supported_locales':['zh-CN']},
-        host_application={'min_version':'1.3.19','max_version':'1.3.19'},
-        sdk={'min_version':'2.21.0','max_version':'2.21.0'}, plugin_type='extension',
+        host_application={'min_version':pins['host']['tag'].removeprefix('v'),'max_version':pins['host']['tag'].removeprefix('v')},
+        sdk={'min_version':pins['sdk']['tag'].removeprefix('v'),'max_version':pins['sdk']['tag'].removeprefix('v')}, plugin_type='extension',
         capabilities=['send.text','send.emoji','send.custom','api.call','llm.generate','behavior.check'])), encoding='utf-8')
     (work / 'sources.json').write_text(json.dumps(evidence, indent=2), encoding='utf-8')
 
@@ -49,14 +50,21 @@ def stage(work, adapter_source):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--workspace', type=Path, default=ROOT)
     parser.add_argument('--host',type=Path,default=ROOT/'maibot')
     parser.add_argument('--adapter',type=Path,default=ROOT/'.implementation/behavior-control/adapter')
     parser.add_argument('--community',action='store_true',help='Focused unchanged-community plugin acceptance')
     parser.add_argument('--sleep',action='store_true',help='Sleeping cognition and automatic memory acceptance')
     args = parser.parse_args()
+    pins_path = args.host.resolve().parent / 'baseline.json'
+    if not pins_path.exists():
+        pins_path = CONTROL / 'baseline.json'
+    pins = json.loads(pins_path.read_text(encoding='utf-8'))
+    if importlib.metadata.version('maibot-plugin-sdk') != pins['sdk']['tag'].removeprefix('v'):
+        raise RuntimeError('Installed SDK does not match the candidate baseline')
     work = (args.output or ROOT / ('.implementation/behavior-control/native-' + str(time.time_ns()))).resolve()
     work.mkdir(parents=True, exist_ok=False)
-    stage(work,args.adapter.resolve())
+    stage(work,args.adapter.resolve(),args.workspace.resolve(),pins)
     safety = work / 'safety'
     safety.mkdir()
     (safety / 'sitecustomize.py').write_text(
@@ -66,7 +74,7 @@ def main():
     env = {k: v for k, v in os.environ.items() if k.upper() in ('SYSTEMROOT','WINDIR','COMSPEC','PATHEXT','NUMBER_OF_PROCESSORS')}
     env.update(PYTHONUTF8='1', PYTHONUNBUFFERED='1', PYTHONDONTWRITEBYTECODE='1',
         PYTHONPATH=os.pathsep.join([str(safety), str(CONTROL / 'tests'), str(args.host.resolve())]),
-        MAIBOT_HOST_VERSION='1.3.19', MAIBOT_INSTANCE_DIR=str(work),
+        MAIBOT_HOST_VERSION=pins['host']['tag'].removeprefix('v'), MAIBOT_INSTANCE_DIR=str(work),
         MAIBOT_COMMUNITY_TEST=str(int(args.community)),
         MAIBOT_SLEEP_TEST=str(int(args.sleep)),
         MAIBOT_BEHAVIOR_CONFIG=str(work / 'behavior.json'), TEMP=str(work), TMP=str(work), USERPROFILE=str(work))

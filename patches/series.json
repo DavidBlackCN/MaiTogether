@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "default": [
+    "behavior",
+    "sleep"
+  ],
+  "groups": {
+    "common": {
+      "requires": [],
+      "host": {
+        "patch": "patches/host/common.patch",
+        "files": [
+          "src/plugin_runtime/capabilities/registry.py",
+          "src/plugin_runtime/host/capability_service.py",
+          "src/plugin_runtime/host/rpc_server.py",
+          "src/plugin_runtime/host/supervisor.py",
+          "src/plugin_runtime/protocol/envelope.py",
+          "src/plugin_runtime/runner/rpc_client.py",
+          "src/plugin_runtime/runner/runner_main.py"
+        ],
+        "modules": [
+          "src/plugin_runtime/behavior_policy/actions.py",
+          "src/plugin_runtime/behavior_policy/build_features.py",
+          "src/plugin_runtime/behavior_policy/context.py",
+          "src/plugin_runtime/behavior_policy/runtime.py",
+          "src/plugin_runtime/behavior_policy/__init__.py"
+        ]
+      }
+    },
+    "behavior": {
+      "requires": [
+        "common"
+      ],
+      "host": {
+        "patch": "patches/host/behavior.patch",
+        "files": [
+          "src/platform_io/manager.py",
+          "src/plugin_runtime/capabilities/core.py",
+          "src/plugin_runtime/component_query.py",
+          "src/plugin_runtime/host/hook_dispatcher.py"
+        ],
+        "modules": [
+          "src/plugin_runtime/behavior_policy/platform.py"
+        ]
+      },
+      "adapter": {
+        "patch": "patches/adapter/behavior.patch",
+        "files": [
+          "_manifest.json",
+          "plugin.py",
+          "runtime_state.py",
+          "services/action_service.py",
+          "transport.py"
+        ],
+        "modules": [
+          "services/behavior_actions.py",
+          "services/behavior_policy.py"
+        ]
+      }
+    },
+    "sleep": {
+      "requires": [
+        "common"
+      ],
+      "host": {
+        "patch": "patches/host/sleep.patch",
+        "files": [
+          "src/A_memorix/core/utils/summary_importer.py",
+          "src/chat/heart_flow/heartflow_message_processor.py",
+          "src/chat/replyer/maisaka_generator_base.py",
+          "src/maisaka/builtin_tool/reply.py",
+          "src/maisaka/chat_loop_service.py",
+          "src/maisaka/focus/group_runtime.py",
+          "src/maisaka/reasoning_engine.py",
+          "src/maisaka/runtime.py",
+          "src/services/memory_flow_service.py"
+        ],
+        "modules": [
+          "src/plugin_runtime/behavior_policy/cognition_hooks.py",
+          "src/plugin_runtime/behavior_policy/sleep_guard.py"
+        ]
+      }
+    }
+  }
+}

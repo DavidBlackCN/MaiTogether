@@ -22,7 +22,7 @@ def record_only(message):
 
 async def pause_reason(session_id):
     policy = get_policy()
-    if not policy.enabled:
+    if not policy.sleep_enabled:
         return ''
     from src.chat.message_receive.chat_manager import chat_manager
     session = await asyncio.to_thread(chat_manager.get_existing_session_by_session_id, session_id)

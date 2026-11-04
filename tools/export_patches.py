@@ -1,42 +1,59 @@
-"""Maintainer tool: regenerate patches and complete output hashes after reviewed edits."""
+"""Export only explicitly owned official-file edits; never expand patch scope silently."""
 from pathlib import Path
 import argparse
 import difflib
 import json
-import io
-import zipfile
-from build import CONTROL,git,normalize
+from assembly import CONTROL, PROFILES, baseline, series, upstream, build_pair, lock_path
 
+def export(source, working, kind):
+    originals = upstream(source, baseline()[kind])
+    assigned = {}
+    for group, spec in series()['groups'].items():
+        for name in spec.get(kind, {}).get('files', []):
+            if name in assigned:
+                raise ValueError('Multiple patch owners: ' + name)
+            assigned[name] = group
+    patches = {group: [] for group in series()['groups']}
+    for name, old in originals.items():
+        from assembly import normalize
+        new = normalize((working / name).read_bytes())
+        if old == new:
+            continue
+        if name not in assigned:
+            raise ValueError('Unreviewed upstream edit: ' + name)
+        patches[assigned[name]].extend(difflib.unified_diff(
+            old.decode('utf-8').splitlines(True), new.decode('utf-8').splitlines(True),
+            fromfile='a/'+name, tofile='b/'+name))
+    for group, spec in series()['groups'].items():
+        item = spec.get(kind)
+        if item is None:
+            continue
+        for name in item['modules']:
+            from assembly import normalize
+            if name in originals or normalize((working / name).read_bytes()) != normalize((CONTROL / kind / name).read_bytes()):
+                raise ValueError('Module source mismatch: ' + name)
+        path = CONTROL / item['patch']
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(''.join(patches[group]), encoding='utf-8', newline='\n')
+    print(kind + ': explicit patch groups exported')
 
-def export(source,working,kind):
-    lock=json.loads((CONTROL/'baseline.json').read_text(encoding='utf-8'))[kind]
-    archive=zipfile.ZipFile(io.BytesIO(git(source,'archive','--format=zip',lock['commit'])))
-    paths=[e.filename for e in archive.infolist() if not e.is_dir()]
-    patch=[];hashes={}
-    import hashlib
-    for name in paths:
-        old=normalize(archive.read(name))
-        path=working/name
-        if not path.is_file(): raise RuntimeError('Missing upstream file: '+name)
-        new=normalize(path.read_bytes())
-        if old!=new:
-            patch.extend(difflib.unified_diff(old.decode('utf-8').splitlines(True),new.decode('utf-8').splitlines(True),
-                         fromfile='a/'+name,tofile='b/'+name))
-        hashes[name]=hashlib.sha256(new).hexdigest()
-    for path in (CONTROL/kind).rglob('*'):
-        if path.is_file() and '__pycache__' not in path.parts:
-            name=path.relative_to(CONTROL/kind).as_posix()
-            if name in hashes: raise RuntimeError('Overlay collision: '+name)
-            actual=(working/name).read_bytes()
-            if actual!=path.read_bytes(): raise RuntimeError('Overlay/runtime mismatch: '+name)
-            hashes[name]=hashlib.sha256(actual).hexdigest()
-    (CONTROL/'patches').mkdir(exist_ok=True);(CONTROL/'locks').mkdir(exist_ok=True)
-    (CONTROL/'patches'/f'{kind}.patch').write_text(''.join(patch),encoding='utf-8',newline='\n')
-    (CONTROL/'locks'/f'{kind}-files.json').write_text(json.dumps(hashes,indent=2)+'\n',encoding='utf-8',newline='\n')
-    print(kind,len(hashes),'files')
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--host-source', type=Path, required=True)
+    parser.add_argument('--adapter-source', type=Path, required=True)
+    parser.add_argument('--host-working', type=Path, required=True)
+    parser.add_argument('--adapter-working', type=Path, required=True)
+    parser.add_argument('--output', type=Path, required=True, help='New directory for all profile rebuilds')
+    args = parser.parse_args()
+    if args.output.exists():
+        raise ValueError('Output already exists')
+    export(args.host_source, args.host_working, 'host')
+    export(args.adapter_source, args.adapter_working, 'adapter')
+    for profile in PROFILES:
+        result = build_pair(args.host_source, args.adapter_source, args.output / profile, profile=profile, verify=False)
+        for kind, files in result['files'].items():
+            lock_path(kind, profile).write_text(json.dumps(files, indent=2)+'\n', encoding='utf-8')
+    print('Locks regenerated; regression validation is still required.')
 
-
-if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--source',type=Path,required=True)
-    p.add_argument('--working',type=Path,required=True);p.add_argument('--kind',choices=['host','adapter'],required=True)
-    a=p.parse_args();export(a.source,a.working,a.kind)
+if __name__ == '__main__':
+    main()

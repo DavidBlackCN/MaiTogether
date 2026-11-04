@@ -15,7 +15,7 @@ MaiCoordinate 是可选插件，用于安排主动分享和空间互动。搜索
 
 ## 快速开始：安装 Host 修改
 
-当前仍处于开发测试阶段。已测试的组合为 **MaiBot 1.3.19 / SDK 2.21.0 / QQ 连接器 1.1.13**，本项目修改版本为 **0.1.1**。
+当前仍处于开发测试阶段。已测试的组合为 **MaiBot 1.3.19 / SDK 2.21.0 / QQ 连接器 1.1.13**，本项目修改版本为 **0.2.0**。
 
 以下命令从**已有的官方 MaiBot 1.3.19 Git 源码**继续，只安装主程序修改，不安装生态插件。需要 Git；MaiBot 的 Python 环境和 SDK 保持上述版本。其他版本请先按官方方式升级，压缩包源码可参考[源码构建](docs/maintenance.md#从源码构建)。
 
@@ -30,59 +30,23 @@ cd MaiTogether
 
 ### Windows（PowerShell）
 
-在 **MaiTogether 目录**打开 PowerShell，将第一行改为已有 MaiBot 的实际路径，然后执行整段：
+在 MaiTogether 目录运行，将 `../MaiBot` 改成你的主程序路径：
 
 ```powershell
-$botDir = (Resolve-Path -LiteralPath "../MaiBot").Path
-& {
-    $ErrorActionPreference = "Stop"
-    $patchFile = (Resolve-Path -LiteralPath "./patches/host.patch").Path
-    $newModule = Join-Path $botDir "src/plugin_runtime/behavior_policy"
-    $revision = git -C "$botDir" rev-parse HEAD
-    if ($LASTEXITCODE -ne 0 -or $revision -ne "c6429547af711555e3d4d1b8d04b413572cb616c") {
-        throw "请使用官方 MaiBot 1.3.19 的固定提交，勿直接给其他版本打补丁。"
-    }
-    $changes = git -C "$botDir" status --porcelain --untracked-files=no
-    if ($LASTEXITCODE -ne 0 -or $changes) { throw "源码存在未提交改动，请先处理后再安装。" }
-    if (Test-Path -LiteralPath $newModule) { throw "已存在行为控制模块，请勿重复安装。" }
-    git -C "$botDir" apply --check "$patchFile"
-    if ($LASTEXITCODE -ne 0) { throw "补丁检查失败，未安装。" }
-    git -C "$botDir" apply "$patchFile"
-    if ($LASTEXITCODE -ne 0) { throw "补丁应用失败，请检查错误信息。" }
-    Copy-Item -LiteralPath "./host/src/plugin_runtime/behavior_policy" -Destination $newModule -Recurse
-    Write-Host "MaiTogether Host 修改已安装。"
-}
+python tools/install.py --host "../MaiBot"
+python tools/install.py --host "../MaiBot" --apply
 ```
 
 ### Linux（Bash）
 
-进入 **MaiTogether 目录**，将第二行改为已有 MaiBot 的实际路径，然后执行整段：
+在 MaiTogether 目录运行：
 
 ```bash
-(
-    bot_dir="../MaiBot"
-    set -eu
-    patch_file="$PWD/patches/host.patch"
-    new_module="$bot_dir/src/plugin_runtime/behavior_policy"
-    if [ "$(git -C "$bot_dir" rev-parse HEAD)" != "c6429547af711555e3d4d1b8d04b413572cb616c" ]; then
-        echo "请使用官方 MaiBot 1.3.19 的固定提交，勿直接给其他版本打补丁。" >&2
-        exit 1
-    fi
-    changes=$(git -C "$bot_dir" status --porcelain --untracked-files=no)
-    if [ -n "$changes" ]; then
-        echo "源码存在未提交改动，请先处理后再安装。" >&2
-        exit 1
-    fi
-    if [ -e "$new_module" ]; then
-        echo "已存在行为控制模块，请勿重复安装。" >&2
-        exit 1
-    fi
-    git -C "$bot_dir" apply --check "$patch_file"
-    git -C "$bot_dir" apply "$patch_file"
-    cp -R ./host/src/plugin_runtime/behavior_policy "$new_module"
-    echo "MaiTogether Host 修改已安装。"
-)
+python3 tools/install.py --host ../MaiBot
+python3 tools/install.py --host ../MaiBot --apply
 ```
+
+第一条命令只检查；第二条会重新检查、备份受影响的源码，再安装。版本不符、源码有改动或新增模块已存在时会停止。备份路径会显示在结果中，可用 `--backup 路径` 指定。写入失败时会恢复本次已修改的文件。
 
 ### 安装后
 
@@ -90,11 +54,11 @@ $botDir = (Resolve-Path -LiteralPath "../MaiBot").Path
 
 **装好 Host 不等于已经启用行为控制。** 没有控制配置时，新增检查默认关闭。要约束 QQ 消息、戳一戳和表情回应，还需配套的修改版 QQ 连接器、状态插件和管理范围配置，见[安装与配置](docs/setup.md)；插件选择见[插件清单](docs/plugins.md)。
 
-若安装途中出错，先恢复备份再启动；以后升级 MaiBot 时需使用对应版本的补丁，不能直接覆盖更新。当前验证使用真实主程序和插件、本地模拟 QQ 与模型，尚未完成真实 QQ、SnowLuma 客户端和 Linux 服务器运行验证。
+若安装报错，先确认源码恢复完整再启动。以后升级 MaiBot 时使用对应稳定版的补丁；维护者可按[升级流程](docs/maintenance.md#跟进官方稳定版)检查新版本、构建并运行回归测试。当前验证使用真实主程序和插件、本地模拟 QQ 与模型，尚未完成真实 QQ、SnowLuma 客户端和 Linux 服务器运行验证。
 
 ## 使用前了解
 
-- **只管理配置中列出的会话**。插件自己的管理范围也要对应设置。
+- **生活和静音检查针对配置中列出的会话**，插件自身范围也要对应设置。开启控制后，未知动作和敏感读取默认拒绝，群管理操作另需明确授权。
 - 睡眠时保留原始消息记录，暂停受管会话的聊天思考与回复生成；醒来不补回睡眠期间的消息。这些记录不会自动作为聊天经历写入记忆。
 - 检查失败或必要插件不可用时，暂停相关发送，避免在状态不明时继续行动。
 - 保护范围是 MaiBot 的标准消息发送和官方 QQ 连接器。插件自行联网、QQ 空间及其他外部工具不受这套检查统一管理。
