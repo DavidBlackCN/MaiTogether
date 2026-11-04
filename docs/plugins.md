@@ -6,7 +6,7 @@
 
 | 插件 | 用途 | 本组合使用的版本 |
 | --- | --- | --- |
-| [MaiVita](https://github.com/DavidBlackCN/maibot-maivita-plugin) | 日程、活动、身体状态和睡眠 | 0.9.2 |
+| [MaiVita](https://github.com/DavidBlackCN/maibot-maivita-plugin) | 日程、活动、身体状态、睡眠与生活页面 | 0.10.0 |
 | [MaiHush](https://github.com/DavidBlackCN/maibot-maihush-plugin) | 群静音、恢复发言和发送次数限制 | 0.3.1 |
 | [MaiIdentity](https://github.com/DavidBlackCN/maibot-maiidentity-plugin) | 固定身份提示、管理员名单和命令权限 | 3.4.1 |
 
@@ -16,7 +16,8 @@
 
 | 插件 | 用途 | 当前说明 |
 | --- | --- | --- |
-| [MaiCoordinate](https://github.com/DavidBlackCN/maibot-maivita-plugin/tree/main/ecosystem/coordinator) | 根据生活状态安排主动分享和空间互动 | 0.4.1，随 Vita 仓库维护；不需要主动表达时可以不装 |
+| [MaiCoordinate](https://github.com/DavidBlackCN/maibot-maivita-plugin/tree/main/ecosystem/coordinator) | 根据生活状态安排主动分享和空间互动 | 0.5.0，随 Vita 仓库维护；不需要主动表达时可以不装 |
+| [日期上下文](https://github.com/xiexiaojia780/date_context_plugin) | 日期、节日与调休参考 | 固定 1.4.6，原版使用；[配置及限制](calendar.md) |
 | [MaiTrace 适配版](https://github.com/DavidBlackCN/maibot-maivita-plugin/tree/main/ecosystem/maitrace) | 为 Coordinate 提供 QQ 空间发布、浏览和互动 | 使用固定版本和配套补丁；空间功能由这两个插件自行检查状态，不属于本项目的 QQ 发送检查范围 |
 | [Smart Poke](https://github.com/TAIY2020/smart_poke_plugin) | 收到戳一戳后作出回应 | 已用原版 1.11.1 测试正常回应及睡眠时的文字、回戳限制 |
 | [Cateye 表情回应](https://github.com/cateyemizuki/cateye_set_msg_emoji_like_api_modify) | 给 QQ 消息贴表情，接收表情通知 | 已用原版 0.3.2 测试正常贴表情及睡眠、忙碌、静音时的限制；存在下述记录问题 |

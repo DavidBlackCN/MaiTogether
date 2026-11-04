@@ -62,6 +62,18 @@ python tools/run_native.py --sleep --workspace .. --host ../control-build/host -
 
 当前原生验收在 Windows 上执行。真实 QQ、SnowLuma、Linux 服务器和长期运行仍需另测；替身不验证真实模型的工具选择和生成质量。
 
+### Vita 生活页面与聊天频率
+
+这组测试还需要工作区 `tools/vita_next_native.py`、[固定版本日期插件](calendar.md)的源码（放在 `.implementation/vendor/date_context_plugin`），以及官方 `maibot-dashboard==1.9.13`、`cnlunar==0.2.4`、`chinese-calendar`、`playwright` 和 Chromium。不需要另行编译前端。
+
+```bash
+python tools/run_native.py --vita-next --workspace .. --browser /path/to/chromium
+```
+
+它会启动真实 WebUI 和 Runner，实际操作三个页面、睡眠与唤醒、生成参考计划、保存配置，并检查群聊倍率及卸载恢复。测试使用真实的一分钟决策冷却，通常需要数分钟。浏览器及模型只访问本机替身，测试账户与配置临时生成。
+
+进程成功退出后才生成 `acceptance.json`；单独存在 `result.json` 不代表整组通过。`sources.json` 记录参测文件哈希，页面截图与日志保留在同一临时目录。
+
 ## 修改补丁与打包
 
 新增逻辑优先放 `host/` 或 `adapter/`。官方代码保留明确的调用位置，不使用运行时替换方法来隐藏改动。`patches/series.json` 是修改范围清单；超出清单的官方文件修改会被导出工具拒绝，需要先审查其必要性。

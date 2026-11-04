@@ -65,7 +65,7 @@ async def run(work):
          'management':{'source':'identity'},'reply':{'enabled':True},'social':{'enabled':True,'task_name':'test'}},
       'maibot-maiIdentity-plugin':{'plugin':{'enabled':True,'config_version':'4'},'management':{'admin_accounts':['10001']},
          'identity':{'people':[{'qq':'10003','nickname':'妈妈'}]}},
-      'maibot-maivita-plugin':{'plugin':{'enabled':True,'config_version':'4'},
+      'maibot-maivita-plugin':{'plugin':{'enabled':True,'config_version':'5'},
          'instance':{'writer_lock':str(work/'vita.lock'),'allowed_streams':[stream]},'model':{'generate_on_start':False}},
       'maibot-maicoordinate-plugin':{'plugin':{'enabled':True,'config_version':'2'},'mode':'shadow',
          'acknowledgement':'isolated-test-instance','model_task':'test','poll_seconds':2},
@@ -81,6 +81,9 @@ async def run(work):
     }
     for folder,config in configs.items():
         (work/'plugins'/folder/'config.toml').write_text(tomli_w.dumps(config),encoding='utf-8')
+    if os.environ.get('MAIVITA_NEXT_TEST')=='1':
+        from vita_next_native import configure
+        configure(work,configs,stream)
     (work/'behavior.json').write_text(json.dumps({'enabled':True,'targets':[{
         'platform':'qq','account_id':'123456789','scope':None,'chat_type':'group','target_id':'987654321',
         'providers':['vita','hush'],'autonomous_plugins':[PROBE,POKE,CATEYE,ADAPTER,COORD,HUSH]}]}),encoding='utf-8')
@@ -96,6 +99,9 @@ async def run(work):
     async def models(plugin_id,capability,args): return ['test']
     generating=asyncio.Event(); generated=asyncio.Event()
     async def model(plugin_id,capability,args):
+        if plugin_id==VITA and os.environ.get('MAIVITA_NEXT_TEST')=='1':
+            from vita_next_native import model_response
+            return await model_response(args,work)
         if plugin_id==PROBE:
             generating.set(); await generated.wait()
             return {'success':True,'response':'test','model_name':'local-fake'}
@@ -168,6 +174,10 @@ async def run(work):
             life=await call(VITA,'get_life_state')
             return bool(drivers) and life.get('ok')
         await wait(ready)
+        if os.environ.get('MAIVITA_NEXT_TEST')=='1':
+            from vita_next_native import run_cases
+            await run_cases(locals())
+            return
         if os.environ.get('MAIBOT_SLEEP_TEST')=='1':
             from sleep_native import run_cases
             await run_cases(locals())
