@@ -1,0 +1,414 @@
+--- a/_manifest.json
++++ b/_manifest.json
+@@ -16,7 +16,7 @@
+   },
+   "sdk": {
+     "min_version": "2.8.1",
+-    "max_version": "2.16.0"
++    "max_version": "2.21.0"
+   },
+   "dependencies": [
+     {
+@@ -49,7 +49,8 @@
+     "api.call",
+     "api.list",
+     "send.hybrid",
+-    "maisaka.proactive.trigger"
++    "maisaka.proactive.trigger",
++    "behavior.send_v1"
+   ],
+   "i18n": {
+     "default_locale": "zh-CN",
+--- a/maiwork/app.py
++++ b/maiwork/app.py
+@@ -555,6 +555,9 @@
+             logger.exception("配置迁移（数据库 → config.toml）出错，按现有配置继续启动")
+         # 2. 宿主（预热 bot_qq，失败不致命）
+         self.host = Host(self._ctx)
++        from .together import Together
++        self.together = Together(self)
++        self.host.together = self.together
+         # 群号 → 平台（qq / telegram）：Host 里不传 platform 的调用按配置自动认
+         self.host.set_platform_resolver(lambda gid: self.get_settings().platform_of(gid))
+         self.host.set_session_group_resolver(self._group_for_session_cached)
+@@ -576,6 +579,7 @@
+             self.store, self.get_settings, transport=self.http_transport,
+             config_writer=self._write_config_and_apply,
+         )
++        self.models.together = self.together
+         self.profiles = self._make_profiles()
+         # 关注成员个人画像模块（persona.py；模块没就位还不至于拖垮别的）
+         self.personas = self._make_personas()
+@@ -613,6 +617,7 @@
+             logger.exception("每群三份启动迁移出错，按现状继续启动（旧来源留到下次再迁）")
+ 
+         self.jev = Jev(self.store, self.get_settings, transport=self.jev_transport)
++        self.jev.together = self.together
+         # 搜索（2026-10）：内置服务全删，只走「扩展」里绑定的那个 MCP——Search 现读
+         # kv["extensions.search"] 绑定 + Extensions 的运行状态；扩展在 _start_extensions 才连上，
+         # 这里先建好壳子（available() 现查，不缓存）。
+@@ -916,6 +921,7 @@
+             logger.exception("回收非服务群残留出错，继续")
+         # 4. 收消息
+         self._intake = self._make_intake()
++        if self._intake is not None: self._intake.together = self.together
+         for gid in settings.groups:
+             await self._intake.refresh_reply_indexes(gid)
+         # 5. 每个服务群建行 + token
+@@ -2328,7 +2334,7 @@
+         if module_cls is None:
+             return None
+         try:
+-            return module_cls(transport=self.herenow_transport)
++            return module_cls(transport=self.herenow_transport, allow_publish=self.together.can_publish)
+         except Exception:
+             logger.exception("建 HereNow 出错，网页链接交付这次跳过")
+             return None
+@@ -2902,6 +2908,10 @@
+ 
+     async def _run_task_guarded(self, task_id: str) -> None:
+         tid = str(task_id)
++        if not await self.together.available():
++            self._running_tasks.discard(tid)
++            return  # queued; the bounded background loop will check again
++        self.together._active_tasks.add(tid)
+         cancelled = False
+         try:
+             if self.coordinator is not None:
+@@ -2917,6 +2927,7 @@
+         except Exception:
+             logger.exception("任务 %s 执行出错", tid)
+         finally:
++            self.together._active_tasks.discard(tid)
+             self._running_tasks.discard(tid)
+             if not cancelled:
+                 self._restart_if_requeued(tid)
+@@ -3255,6 +3266,8 @@
+             self._remember_session_row(gid, sig.session_id, sig.last_ts)
+         # 2) 每个服务群串行处理；单个群出错不影响别的
+         for gid in list(self._settings.groups.keys()):
++            if not await self.together.available(gid):
++                continue
+             if self._intake is not None:
+                 await self._intake.refresh_reply_indexes(gid, now)
+             try:
+@@ -4197,6 +4210,8 @@
+             run_ref.detach()  # 别带着起它的那一轮（如管理员对话）的标记跑完整个长活
+             cancelled = False
+             try:
++                if not await self.together.available(gid):
++                    return
+                 await fn(gid)
+             except asyncio.CancelledError:
+                 # 被取消 = 插件热重载 / 停止，不是「这个时段做过了」：记号留给下次重载后照常触发
+--- a/maiwork/commands.py
++++ b/maiwork/commands.py
+@@ -301,11 +301,14 @@
+         if sub in _HELP_ALIASES:
+             return help_text(self._bot_name())
+         if sub in ("批准", "通过"):
+-            return await self._decide(gid, user_id, arg, op="approve")
++            return await self._decide(gid, user_id, arg, op="approve", message_id=message_id, raw=raw)
+         if sub == "拒绝":
+-            return await self._decide(gid, user_id, arg, op="reject")
++            return await self._decide(gid, user_id, arg, op="reject", message_id=message_id, raw=raw)
+         if sub == "取消":
+-            return await self._cancel(gid, user_id, arg)
++            from .together import integration
++            together = integration(self._host)
++            admin = await together.command_admin(gid,user_id,message_id,raw) if together is not None else False
++            return await self._cancel(gid, user_id, arg, identity_admin=admin)
+         if sub == "领取":
+             return await self._claim_delivery(gid, arg)
+         # 不认的子命令：看着像派活（和 @ 派活同一份请求词表）就给一行能照抄的 /mw do
+@@ -508,18 +511,19 @@
+         except Exception:
+             return "qq"
+ 
+-    async def _decide(self, gid: str, user_id: str, rid: str, *, op: str) -> str:
++    async def _decide(self, gid: str, user_id: str, rid: str, *, op: str, message_id="", raw="") -> str:
+         verb = "批准" if op == "approve" else "拒绝"
+         try:
+             # 只认本群那份名单（全局管理员是种进来的，删了就批不了；不再回全局并集）
+-            is_approver = bool(
+-                self._approvals.is_admin(user_id, platform=self._platform_of(gid), group_id=gid)
+-            )
++            from .together import integration
++            together = integration(self._host)
++            is_approver = (await together.command_admin(gid,user_id,message_id,raw) if together is not None else
++                bool(self._approvals.is_admin(user_id, platform=self._platform_of(gid), group_id=gid)))
+         except Exception:
+             logger.exception("/mw 判批准人失败")
+             return "这条指令处理出错了，日志里有"
+         if not is_approver:
+-            return "只有 bot 管理员或本群管理员能批准 / 拒绝"
++            return "只有配置的任务管理员能批准 / 拒绝"
+         rid_s = str(rid or "").strip()
+         if not rid_s:
+             try:
+@@ -616,7 +620,7 @@
+     # /mw 取消 [ID]：发起人 / 群主 / 群管理 / bot 管理员
+     # ------------------------------------------------------------------
+ 
+-    async def _cancel(self, gid: str, user_id: str, ident: str) -> str:
++    async def _cancel(self, gid: str, user_id: str, ident: str, *, identity_admin=False) -> str:
+         ident_s = str(ident or "").strip().upper()
+         if not ident_s or "-" not in ident_s:
+             return "把要取消的 ID 带上（任务 T-x、目标 G-x、提醒 M-x），比如 /mw 取消 T-3"
+@@ -647,6 +651,10 @@
+             allowed = self._approvals.can_cancel(
+                 kind, ident_s, user_id, group_role=str(role or ""), group_id=gid
+             )
++            from .together import integration
++            if integration(self._host) is not None:
++                allowed = (identity_admin or str(role or '') in ('owner','admin') or
++                           str(obj.get('requester_id' if kind=='task' else 'who_id') or '') == str(user_id))
+         except Exception:
+             logger.exception("/mw 取消判权限失败")
+             allowed = False
+--- a/maiwork/config.py
++++ b/maiwork/config.py
+@@ -483,7 +483,14 @@
+     bot_names: list[str] = Field(default_factory=list, description="机器人显示名；保存后下次加载注册")
+ 
+ 
++class TogetherSectionConfig(PluginConfigBase):
++    __ui_label__ = "MaiTogether 联动"
++    enabled: bool = Field(default=True, description="查询 Vita 生活状态和 Identity 管理员；发送必须经过配套 MaiTogether")
++    public_publish: bool = Field(default=False, description="允许向公开网站发布成品、回退附件及续期；关闭时文件保留在工作台")
++
++
+ class MaiWorkConfig(PluginConfigBase):
++    together: TogetherSectionConfig = Field(default_factory=TogetherSectionConfig)
+     plugin: PluginSectionConfig = Field(default_factory=PluginSectionConfig)
+     groups: GroupsSectionConfig = Field(default_factory=GroupsSectionConfig)
+     focus: FocusSectionConfig = Field(default_factory=FocusSectionConfig)
+@@ -967,6 +974,7 @@
+     # App 启动时先设 False，只有 migrate_group_controls 真跑成功才开（见
+     # app._open_group_controls_seed_gate）。门关着时 GroupApprovals / group_push
+     # 读**已有**合法记录照旧尊重，但缺失记录只回安全默认、绝不播种。
++    together: TogetherSectionConfig = field(default_factory=TogetherSectionConfig)
+     group_controls_seed_ready: bool = True
+     problems: tuple[str, ...] = ()
+ 
+@@ -1748,6 +1756,7 @@
+ 
+ 
+ _SECTIONS: tuple[tuple[str, type[PluginConfigBase]], ...] = (
++    ("together", TogetherSectionConfig),
+     ("plugin", PluginSectionConfig),
+     ("groups", GroupsSectionConfig),
+     ("focus", FocusSectionConfig),
+@@ -1932,6 +1941,7 @@
+             token_limit=max(0, _clamp_int(getattr(tasks_cfg, "token_limit", 2_000_000), 0, 10**9, 2_000_000)),
+             run_seconds=max(0, _clamp_int(getattr(tasks_cfg, "run_seconds", 10800), 0, 30 * 86400, 10800)),
+         ),
++        together=sections["together"],
+         console=ConsoleSetting(
+             listen=listen,
+             password=str(console.password or ""),
+--- a/maiwork/extensions.py
++++ b/maiwork/extensions.py
+@@ -151,6 +151,9 @@
+             logger.warning("MCP 扩展 %s 连接出意外错：%s", setting.name, type(e).__name__, exc_info=True)
+             return
+         whitelist = set(setting.tools)
++        if not whitelist:
++            ext.error = '请明确填写允许使用的 MCP 工具；空名单不导入工具'
++            return
+         registered = 0
+         for spec in remote_tools:
+             remote_name = str(spec.get("name") or "").strip()
+--- a/maiwork/herenow.py
++++ b/maiwork/herenow.py
+@@ -185,12 +185,15 @@
+ class HereNow:
+     """here.now 匿名发布。transport 是给测试用的 httpx.MockTransport。"""
+ 
+-    def __init__(self, transport: Any = None, client_header: str = "maiwork/plugin") -> None:
++    def __init__(self, transport: Any = None, client_header: str = "maiwork/plugin", *, allow_publish=None) -> None:
++        self._allow_publish = allow_publish
+         self._transport = transport
+         self._client_header = str(client_header or "maiwork/plugin")
+ 
+     async def publish(self, directory: Path) -> dict:
+         """发布一个目录，返回 {"url", "slug", "expires_ts", "claim_url", "claim_token"}。"""
++        if self._allow_publish is None or not await self._allow_publish():
++            raise HereNowError('公开发布未获允许；成品保留在工作台')
+         directory = Path(directory)
+         if not directory.is_dir():
+             raise HereNowError(f"发布目录不存在或不是目录：{directory}")
+--- a/maiwork/host.py
++++ b/maiwork/host.py
+@@ -875,6 +875,11 @@
+     async def _send_segments(
+         self, session_id: str, segments: list[dict[str, Any]], plain: str
+     ) -> SendResult:
++        from .together import integration
++        together = integration(self)
++        if together is not None:
++            return await together.delivery('message', dict(segments=segments, stream_id=session_id,
++                sync_to_maisaka_history=True, storage_message=True, processed_plain_text=plain))
+         result = await self._call(
+             "send.hybrid",
+             segments=segments,
+@@ -911,6 +916,10 @@
+         """上传群文件。上传不幂等：绝不重试。"""
+         if not has_onebot(self._plat(group_id, platform)):
+             raise HostError("这个平台不支持上传群文件（适配器没有群文件接口），走网页链接交付")
++        from .together import integration
++        together = integration(self)
++        if together is not None:
++            return await together.delivery('file', dict(group_id=group_id, file=path, name=name))
+         result = await self._api_call(
+             "adapter.napcat.file.upload_group_file",
+             {"group_id": group_id, "file": path, "name": name},
+--- a/maiwork/intake.py
++++ b/maiwork/intake.py
+@@ -510,6 +510,9 @@
+             message = kwargs.get("message")
+             if not isinstance(message, dict):
+                 return _CONTINUE
++            together = getattr(self, 'together', None)
++            if together is not None and not await together.available(group_id):
++                return _CONTINUE  # Host retains the message; no stale commands are replayed
+             session_id = str(message.get("session_id") or "")
+             self._signals.mark(group_id, session_id, _ts_of(message.get("timestamp")))
+             # 上次进程留下的待判 @ spool：每个进程补一次（纯 spawn，钩子里零磁盘等待；
+--- a/maiwork/jev.py
++++ b/maiwork/jev.py
+@@ -564,6 +564,9 @@
+             timeout_ms: 单次调用超时，默认 settings.jev.timeout_ms。
+         """
+         if not self.available():
++            return None
++        together = getattr(self, 'together', None)
++        if together is not None and not await together.available(group_id):
+             return None
+         settings = self._settings()
+         target = self._target()
+--- a/maiwork/models.py
++++ b/maiwork/models.py
+@@ -2634,6 +2634,9 @@
+           `ModelError`（含 400 适配路径）→ None。
+         """
+         agent_kind = str(agent or "").strip() or ("main" if str(role or "") == "main" else "task")
++        together = getattr(self, 'together', None)
++        if together is not None:
++            await together.model_guard(group_id, task_id)
+         recipe = self._prefix_recipe_lookup(agent_kind, group_id, task_id, purpose)
+         if recipe is None or not str(instruction or ""):
+             return None
+@@ -3395,8 +3398,14 @@
+     ) -> ChatResult:
+         """chat 的实现体，只供 chat 调用（外层的 async with main_run.auto 包着它；
+         没合回一个函数只是因为合回会让整个函数体多缩进一层）。"""
++        together = getattr(self, 'together', None)
++        if together is not None:
++            await together.model_guard(group_id, task_id)
+         settings = self._get_settings()
+         msgs = _strip_internal_keys(list(messages or []))
++        if together is not None and together.enabled:
++            from .together import IDENTITY_RULE
++            msgs = [{"role": "system", "content": IDENTITY_RULE}, *msgs]
+         agent_kind = str(agent or "").strip()
+         if not agent_kind:
+             agent_kind = "main" if str(role or "") == "main" else "task"
+@@ -3582,6 +3591,8 @@
+                 status = 0
+                 try:
+                     async with self._throttle.slot(endpoint, concurrency=max_conc, max_rpm=max_rpm):
++                        if together is not None:
++                            await together.model_guard(group_id, task_id)
+                         status, err_text, data = await asyncio.wait_for(
+                             self._post_protocol(client, protocol, url, body, headers, timeout), timeout=timeout
+                         )
+--- a/maiwork/outbox.py
++++ b/maiwork/outbox.py
+@@ -819,6 +819,11 @@
+             return int(row["id"])
+         now = clock.now()
+         with (self._store.tx() if conn is None else nullcontext(conn)) as conn:
++            from .together import integration
++            if integration(self._host) is not None and task_id and kind == 'text' and payload.get('push_kind') == 'status':
++                conn.execute("UPDATE outbox SET status='dropped', error='已有较新的任务进度', updated=? "
++                    "WHERE task_id=? AND group_id=? AND kind='text' AND status='pending' "
++                    "AND json_extract(payload, '$.push_kind')='status'", (now,str(task_id),str(group_id)))
+             cur = conn.execute(
+                 "INSERT INTO outbox (key, group_id, kind, payload, status, attempts,"
+                 " result, error, task_id, not_before, created, updated)"
+@@ -1439,6 +1444,9 @@
+             try:
+                 file_id = await self._host.upload_group_file(gid, str(safe_path), name)
+             except HostError as exc:
++                from .together import DeliveryError
++                if isinstance(exc, DeliveryError) and exc.state != 'failed':
++                    raise
+                 # 只有「QQ 端读不到路径」（调 QQ 之前就失败、上传肯定没执行）才重传一次，
+                 # 改用 base64:// 带内容；其余错误（超时、未知）绝不重传——上传不幂等
+                 if upload_error_kind(str(exc)) != "path_unreadable":
+@@ -2005,6 +2013,18 @@
+                     self._postpone(oid, gid, reason or "推送节制", now, payload=payload)
+                     continue
+ 
++            from .together import integration
++            together = integration(self._host)
++            if together is not None:
++                permitted = await together.available(gid)
++                if kind == 'herenow' and not together.app.get_settings().together.public_publish:
++                    permitted = False
++                    together.last_reason = '未开启公开发布，成品保留在工作台'
++                if not permitted:
++                    self._set(oid, status='pending', error=together.last_reason,
++                              not_before=now+60, moment=now)
++                    continue
++
+             # 先落库 sending（CAS：只有仍是 pending 且到点的行才抢得到），再执行（崩了 recover 能捡到）
+             attempts = self._claim(oid, moment=now)
+             if attempts <= 0:
+@@ -2017,6 +2037,13 @@
+                 result = await self._execute(row)
+             except Exception as exc:
+                 err = _redact(str(exc), [])
++                from .together import DeliveryError
++                if isinstance(exc, DeliveryError):
++                    status = 'pending' if exc.state == 'deferred' else 'uncertain' if exc.state in ('unknown','partial') else 'failed'
++                    self._set(oid, status=status, error=err, moment=now, not_before=now+60)
++                    self._fire_result(_row_after(self._store, oid), payload,
++                        outcome=status, error=err, now=now)
++                    continue  # Never turn a policy refusal or uncertain delivery into a public upload
+                 if self._is_timeout(exc):
+                     # 超时：可能已经发出去了，绝不重发
+                     self._set(oid, status="uncertain", error=err, moment=now)
+--- a/maiwork/rules.py
++++ b/maiwork/rules.py
+@@ -621,6 +621,8 @@
+     _F("tasks.run_seconds", "时长上限（秒）", "单个任务运行超过该时长时暂停；0 表示不限制。", "int", min=0, max=30*86400),
+ 
+     # ---- console ----
++    _F("together.enabled", "生活与权限联动", "需要配套 MaiTogether、Vita 和 Identity；接口故障时暂停相关操作。", "bool"),
++    _F("together.public_publish", "允许公开发布", "允许任务网页、附件回退和续期上传到公开网站；关闭时成品保留在工作台。", "bool"),
+     _F("console.listen", "监听地址", "格式为 IP:端口。", "str", check=_check_listen),
+     _F("console.password", "管理密码", "", "secret"),
+     _F("console.public_url", "公开网址", "用于生成群链接，例如 https://maiwork.example.com。", "str", check=_check_public_url),
+@@ -696,6 +698,7 @@
+ ]
+ 
+ CONFIG_SECTIONS: list[dict[str, str]] = [
++    {"id": "together", "label": "MaiTogether 联动"},
+     {"id": "groups", "label": "服务群"},
+     {"id": "focus", "label": "关注成员"},
+     {"id": "feeds", "label": "资讯"},
+--- a/maiwork/session_gate.py
++++ b/maiwork/session_gate.py
+@@ -282,6 +282,10 @@
+             if candidate is None:
+                 return _CONTINUE
+             gid, platform, uid, message, snapshot, admin, ats = candidate
++            from .together import integration
++            together = integration(self.host)
++            if together is not None and not await together.available(gid):
++                return _CONTINUE
+             mid = str(message.get("message_id") or "")
+             if not mid:
+                 return _CONTINUE

@@ -2,6 +2,7 @@
 from pathlib import Path
 import argparse
 import hashlib
+import importlib.util
 import json
 import shutil
 import subprocess
@@ -19,7 +20,9 @@ def copy_files(source,target,names):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--workspace',type=Path,required=True)
-    p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+    p.add_argument('--output',type=Path,required=True)
+    p.add_argument('--maiwork-source',type=Path,help='Include the pinned MaiWork adaptation')
+    a=p.parse_args()
     root=a.workspace.resolve();out=a.output.resolve()
     archive=out.with_name(out.name+'.zip')
     if out.exists() or archive.exists():raise ValueError('Delivery output must not exist')
@@ -41,11 +44,16 @@ def main():
     copy_files(source,out/'plugins/maibot-maicoordinate-plugin',names)
     pins['maibot-maicoordinate-plugin']={'version':json.loads((source/'_manifest.json').read_text(encoding='utf-8'))['version'],
                                        'included_in':pins['maibot-maivita-plugin']['commit']}
+    if a.maiwork_source:
+        spec=importlib.util.spec_from_file_location('maiwork_build',CONTROL/'integrations/maiwork/build.py')
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        module.build(a.maiwork_source,out/'plugins/MaiWork')
+        pins['MaiWork']=json.loads((CONTROL/'integrations/maiwork/baseline.json').read_text(encoding='utf-8'))
     shutil.copytree(CONTROL,out/'maintenance',ignore=shutil.ignore_patterns('__pycache__','*.pyc','.git','.pytest_cache'))
     (out/'core-versions.json').write_text(json.dumps(pins,indent=2)+'\n',encoding='utf-8')
     version=json.loads((CONTROL/'baseline.json').read_text(encoding='utf-8'))['adaptation_version']
     (out/'README.md').write_text(f'# MaiTogether {version}\n\n'
-        f'`host/` 为组装后的 Host {baseline["host"]["tag"]}；将 `plugins/` 的四个插件及 `adapter/` 连接器安装到 Host 的插件目录，同一插件仅保留一份。\n\n'
+        f'`host/` 为组装后的 Host {baseline["host"]["tag"]}；将 `plugins/` 中的插件及 `adapter/` 连接器安装到 Host 的插件目录，同一插件仅保留一份。\n\n'
         f'依赖、配置、测试和回滚说明见 [维护说明](maintenance/README.md)。SDK 固定为 {baseline["sdk"]["tag"]}，详见 maintenance/baseline.json。\n\n'
         '本包不含运行配置、账号、数据库、日志或虚拟环境。启用前填写完整目标与受管范围；真实 QQ、SnowLuma 和 Linux 服务器仍须验收。\n',encoding='utf-8')
     manifest=hashes(out)

@@ -52,11 +52,21 @@ async def run(work):
             elif action.startswith('get_') or action.startswith('can_'): data={}
             else:
                 writes.append({'action':action,'params':params})
-                data={'message_id':-100-len(writes)}
+                data={'message_id':-100-len(writes), 'file_id':'fixture-file'}
                 if faults['drop']==action: continue
             await ws.send_json({'status':'ok','retcode':0,'data':data,'echo':body['echo']})
         return ws
+    model_calls=[]
+    async def work_model(request):
+        model_calls.append(await request.json())
+        if faults.get('hold_model'):
+            faults['model_started'].set()
+            await faults['model_release'].wait()
+        return web.json_response({'id':'fixture','model':'fixture','choices':[{'index':0,
+            'message':{'role':'assistant','content':'fixture result'},'finish_reason':'stop'}],
+            'usage':{'prompt_tokens':3,'completion_tokens':2,'total_tokens':5}})
     app=web.Application(); app.router.add_get('/',ws_handler)
+    if os.environ.get('MAIWORK_TEST')=='1': app.router.add_post('/v1/chat/completions',work_model)
     server=web.AppRunner(app); await server.setup()
     site=web.TCPSite(server,'127.0.0.1',0); await site.start()
     port=site._server.sockets[0].getsockname()[1]
@@ -79,6 +89,9 @@ async def run(work):
          'bystander':{'enabled':False},'proactive':{'enabled':False}},
       'cateye':{'plugin':{'enabled':True,'config_version':'0.3.2'},'emoji_reaction':{'tool_cooldown_seconds':0}},
     }
+    if os.environ.get('MAIWORK_TEST')=='1':
+        from maiwork_native import configure
+        configure(work, configs, port)
     for folder,config in configs.items():
         (work/'plugins'/folder/'config.toml').write_text(tomli_w.dumps(config),encoding='utf-8')
     if os.environ.get('MAIVITA_NEXT_TEST')=='1':
@@ -86,7 +99,7 @@ async def run(work):
         configure(work,configs,stream)
     (work/'behavior.json').write_text(json.dumps({'enabled':True,'targets':[{
         'platform':'qq','account_id':'123456789','scope':None,'chat_type':'group','target_id':'987654321',
-        'providers':['vita','hush'],'autonomous_plugins':[PROBE,POKE,CATEYE,ADAPTER,COORD,HUSH]}]}),encoding='utf-8')
+        'providers':['vita','hush'],'autonomous_plugins':[PROBE,POKE,CATEYE,ADAPTER,COORD,HUSH]+(['chartyr.maiwork'] if os.environ.get('MAIWORK_TEST')=='1' else [])}]}),encoding='utf-8')
     from src.plugin_runtime.integration import get_plugin_runtime_manager
     from src.plugin_runtime.host.supervisor import PluginSupervisor
     from src.plugin_runtime.behavior_policy.runtime import get_policy
@@ -174,6 +187,10 @@ async def run(work):
             life=await call(VITA,'get_life_state')
             return bool(drivers) and life.get('ok')
         await wait(ready)
+        if os.environ.get('MAIWORK_TEST')=='1':
+            from maiwork_native import run_cases
+            await run_cases(locals())
+            return
         if os.environ.get('MAIVITA_NEXT_TEST')=='1':
             from vita_next_native import run_cases
             await run_cases(locals())

@@ -1,6 +1,6 @@
 --- a/src/plugin_runtime/capabilities/registry.py
 +++ b/src/plugin_runtime/capabilities/registry.py
-@@ -17,6 +17,10 @@
+@@ -17,6 +17,12 @@
  def register_capability_impls(manager: "PluginRuntimeManager", supervisor: "PluginSupervisor") -> None:
      """向指定 Supervisor 注册主程序提供的能力实现。"""
      cap_service = supervisor.capability_service
@@ -8,6 +8,8 @@
 +    policy = get_policy()
 +    policy.manager = manager
 +    cap_service.register_capability("behavior.check", policy.capability)
++    from src.plugin_runtime.behavior_policy.delivery import register
++    register(manager, supervisor)
      cap_service.register_capability("webui.claim_upload", claim_upload)
      cap_service.register_capability("internal_chat.identity", internal_chat.identity)
      cap_service.register_capability("internal_chat.send", internal_chat.send)

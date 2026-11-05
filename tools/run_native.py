@@ -58,6 +58,7 @@ def main():
     parser.add_argument('--community',action='store_true',help='Focused unchanged-community plugin acceptance')
     parser.add_argument('--sleep',action='store_true',help='Sleeping cognition and automatic memory acceptance')
     parser.add_argument('--vita-next',action='store_true',help='Life WebUI, calendar and frequency acceptance')
+    parser.add_argument('--maiwork',type=Path,help='Assembled MaiWork adaptation for isolated acceptance')
     parser.add_argument('--browser',type=Path,help='Chromium executable for isolated browser acceptance')
     args = parser.parse_args()
     pins_path = args.host.resolve().parent / 'baseline.json'
@@ -69,6 +70,20 @@ def main():
     work = (args.output or ROOT / ('.implementation/behavior-control/native-' + str(time.time_ns()))).resolve()
     work.mkdir(parents=True, exist_ok=False)
     stage(work,args.adapter.resolve(),args.workspace.resolve(),pins,args.vita_next)
+    if args.maiwork:
+        shutil.copytree(args.maiwork, work/'plugins/maiwork', ignore=shutil.ignore_patterns(
+            '.git','__pycache__','tests','docs','config.toml'))
+        shutil.copyfile(CONTROL/'integrations/maiwork/tests/native_probe.py', work/'plugins/maiwork/native_probe.py')
+        entry=work/'plugins/maiwork/plugin.py'
+        text=entry.read_text(encoding='utf-8').replace('class MaiWorkPlugin(MaiBotPlugin):',
+            'from .native_probe import NativeProbe\n\nclass MaiWorkPlugin(NativeProbe, MaiBotPlugin):')
+        entry.write_text(text,encoding='utf-8')
+        sources_path=work/'sources.json'
+        evidence=json.loads(sources_path.read_text(encoding='utf-8'))
+        for path in sorted((work/'plugins/maiwork').rglob('*')):
+            if path.is_file():
+                evidence['maiwork/'+path.relative_to(work/'plugins/maiwork').as_posix()]=hashlib.sha256(path.read_bytes()).hexdigest()
+        sources_path.write_text(json.dumps(evidence,indent=2),encoding='utf-8')
     safety = work / 'safety'
     safety.mkdir()
     (safety / 'sitecustomize.py').write_text(
@@ -77,11 +92,12 @@ def main():
         "sys.addaudithook(audit)\n", encoding='utf-8')
     env = {k: v for k, v in os.environ.items() if k.upper() in ('SYSTEMROOT','WINDIR','COMSPEC','PATHEXT','NUMBER_OF_PROCESSORS')}
     env.update(PYTHONUTF8='1', PYTHONUNBUFFERED='1', PYTHONDONTWRITEBYTECODE='1',
-        PYTHONPATH=os.pathsep.join([str(safety), str(CONTROL / 'tests'), str(args.workspace.resolve()/'tools'), str(args.host.resolve())]),
+        PYTHONPATH=os.pathsep.join([str(safety), str(CONTROL / 'tests'), str(CONTROL/'integrations/maiwork/tests'), str(args.workspace.resolve()/'tools'), str(args.host.resolve())]),
         MAIBOT_HOST_VERSION=pins['host']['tag'].removeprefix('v'), MAIBOT_INSTANCE_DIR=str(work),
         MAIBOT_COMMUNITY_TEST=str(int(args.community)),
         MAIBOT_SLEEP_TEST=str(int(args.sleep)),
         MAIVITA_NEXT_TEST=str(int(args.vita_next)),
+        MAIWORK_TEST=str(int(bool(args.maiwork))),
         MAIBOT_WEBUI_USE_LOCAL_DASHBOARD='1',
         MAIBOT_BEHAVIOR_CONFIG=str(work / 'behavior.json'), TEMP=str(work), TMP=str(work), USERPROFILE=str(work))
     if args.browser:env['MAIVITA_BROWSER']=str(args.browser.resolve())
@@ -102,7 +118,7 @@ def main():
     else:
         result=json.loads((work/'result.json').read_text(encoding='utf-8'))
         (work/'acceptance.json').write_text(json.dumps({
-            'passed':True,'kind':'vita-next' if args.vita_next else 'community' if args.community else 'sleep' if args.sleep else 'behavior',
+            'passed':True,'kind':'maiwork' if args.maiwork else 'vita-next' if args.vita_next else 'community' if args.community else 'sleep' if args.sleep else 'behavior',
             'baseline':pins,'cases':result['cases'],
             'sources_sha256':hashlib.sha256((work/'sources.json').read_bytes()).hexdigest(),
         },indent=2),encoding='utf-8')

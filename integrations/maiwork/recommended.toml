@@ -1,0 +1,43 @@
+# 合并到 MaiWork 自动生成的配置中；填写真实服务群，模型在工作台选择。
+[plugin]
+enabled = true
+config_version = "0.5.4"
+
+[together]
+enabled = true
+public_publish = false
+
+[groups]
+serve = []
+
+[approval]
+required = true
+auto_review = false
+admins = []
+exempt_groups = []
+exempt_users = []
+
+[focus]
+personal_profile = false
+personal_feeds = false
+
+[group_space]
+enabled = false
+
+[environments]
+railway = false
+freestyle = false
+local_network = false
+max_parallel = 1
+
+[console]
+listen = "127.0.0.1:18650"
+herenow_share = false
+update_check = false
+
+[tasks]
+token_limit = 100000
+run_seconds = 3600
+
+[extensions]
+mcp = []

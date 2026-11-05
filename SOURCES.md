@@ -15,6 +15,8 @@
 
 其他插件的来源见[插件清单](docs/plugins.md)，各自保留原作者和许可证。
 
+[MaiWork 0.15.3](https://github.com/CharTyr/MaiWork/tree/ed29864de132622f04c34846ad97ecdf3f9ba0d8) 的配套适配位于 [integrations/maiwork](integrations/maiwork/README.md)。构建保留上游 AGPL-3.0-or-later 许可证、插件 ID 和作者信息；MaiWork 适配补丁与新增模块也按 AGPL-3.0-or-later 提供。
+
 ## 许可证
 
 Host 上游附 GPL 第 3 版许可证，原文保存在 [licenses/Host-LICENSE](licenses/Host-LICENSE)。

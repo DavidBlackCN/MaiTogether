@@ -31,7 +31,7 @@ def hashes(directory):
 
 def inputs_digest():
     paths = [CONTROL / 'baseline.json', CONTROL / 'patches/series.json']
-    for folder in ('host', 'adapter', 'tools', 'tests', 'patches'):
+    for folder in ('host', 'adapter', 'tools', 'tests', 'patches', 'integrations'):
         paths.extend(p for p in (CONTROL / folder).rglob('*')
                      if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc')
     values = {p.relative_to(CONTROL).as_posix(): hashlib.sha256(normalize(p.read_bytes())).hexdigest()

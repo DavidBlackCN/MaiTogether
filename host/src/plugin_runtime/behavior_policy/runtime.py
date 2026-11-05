@@ -153,7 +153,7 @@ class BehaviorPolicy:
     def _record(self, entry, state, reason=''):
         entry['state'] = state
         if 'results' in entry:
-            entry['results'].append({'action_id': entry['id'], 'state': state})
+            entry['results'].append({'action_id': entry['id'], 'state': state, 'reason': reason})
         event = dict(action_id=entry['id'], category=entry['category'], state=state, reason=reason,
                      route_fingerprint=fingerprint(entry['route']), at=time.time(),
                      final_ms=round((time.monotonic()-entry['checking_at'])*1000, 3) if state in ('permitted','denied') and 'checking_at' in entry else None,
