@@ -12,6 +12,7 @@
 
 - [Smart Poke 1.11.1](https://github.com/TAIY2020/smart_poke_plugin/tree/59ff292b4d912a5cbe5d09cce32381e8497d350f)。
 - [Cateye 表情回应 0.3.2](https://github.com/cateyemizuki/cateye_set_msg_emoji_like_api_modify/tree/f239878a3eb217fa4730fb9569c2277de4beaa01)。
+- [MaiWeave 0.9.0 源码基线](https://github.com/ilworkcn/MaiWeave/tree/70976f517c051a8b341f81aca3dfffbc1e1990e7)，使用上游 GPL-3.0-only 许可证。接入使用公开只读 API，审查提交记录在 [integrations/maiweave/baseline.json](integrations/maiweave/baseline.json)；后续开发以当时默认分支最新源码为准。
 
 其他插件的来源见[插件清单](docs/plugins.md)，各自保留原作者和许可证。
 

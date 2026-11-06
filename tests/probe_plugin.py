@@ -4,9 +4,25 @@ import json
 
 
 class Probe(MaiBotPlugin):
-    async def on_load(self): pass
+    async def on_load(self):
+        self.life_result = {'version': 1, 'decision': 'allow', 'reason': 'available'}
+        self.life_delay = 0
     async def on_unload(self): pass
     async def on_config_update(self, scope, config_data, version): pass
+
+    @API('fixture_life', public=False, version='1')
+    async def fixture_life(self, **kwargs):
+        import asyncio
+        control = self.ctx.behavior_context()
+        if not isinstance(control.get('request'), dict):
+            return {'version': 1, 'decision': 'deny', 'reason': 'untrusted_request'}
+        await asyncio.sleep(self.life_delay)
+        return dict(self.life_result)
+
+    @API('set_fixture_life', public=False, version='1')
+    async def set_fixture_life(self, result, delay=0):
+        self.life_result, self.life_delay = result, delay
+        return True
 
     @Command('control_test',pattern=r'^/control_test(?:\s|$)',description='Isolated management fixture')
     async def management(self,text='',**kwargs):

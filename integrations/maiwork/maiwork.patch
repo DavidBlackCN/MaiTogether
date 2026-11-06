@@ -168,13 +168,15 @@
              allowed = False
 --- a/maiwork/config.py
 +++ b/maiwork/config.py
-@@ -483,7 +483,14 @@
+@@ -483,7 +483,16 @@
      bot_names: list[str] = Field(default_factory=list, description="机器人显示名；保存后下次加载注册")
  
  
 +class TogetherSectionConfig(PluginConfigBase):
 +    __ui_label__ = "MaiTogether 联动"
-+    enabled: bool = Field(default=True, description="查询 Vita 生活状态和 Identity 管理员；发送必须经过配套 MaiTogether")
++    enabled: bool = Field(default=True, description="查询生活状态和 Identity 管理员；发送必须经过配套 MaiTogether")
++    life_provider: str = Field(default='vita', pattern='^(vita|maiweave)$', description="生活后端：vita 或 maiweave；需与 MaiTogether 的后端保持一致")
++    life_max_age_seconds: int = Field(default=180, ge=10, le=3600, description="MaiWeave 状态最大年龄（秒）；与 Host 保持一致，须大于生活更新间隔")
 +    public_publish: bool = Field(default=False, description="允许向公开网站发布成品、回退附件及续期；关闭时文件保留在工作台")
 +
 +
@@ -183,7 +185,7 @@
      plugin: PluginSectionConfig = Field(default_factory=PluginSectionConfig)
      groups: GroupsSectionConfig = Field(default_factory=GroupsSectionConfig)
      focus: FocusSectionConfig = Field(default_factory=FocusSectionConfig)
-@@ -967,6 +974,7 @@
+@@ -967,6 +976,7 @@
      # App 启动时先设 False，只有 migrate_group_controls 真跑成功才开（见
      # app._open_group_controls_seed_gate）。门关着时 GroupApprovals / group_push
      # 读**已有**合法记录照旧尊重，但缺失记录只回安全默认、绝不播种。
@@ -191,7 +193,7 @@
      group_controls_seed_ready: bool = True
      problems: tuple[str, ...] = ()
  
-@@ -1748,6 +1756,7 @@
+@@ -1748,6 +1758,7 @@
  
  
  _SECTIONS: tuple[tuple[str, type[PluginConfigBase]], ...] = (
@@ -199,7 +201,7 @@
      ("plugin", PluginSectionConfig),
      ("groups", GroupsSectionConfig),
      ("focus", FocusSectionConfig),
-@@ -1932,6 +1941,7 @@
+@@ -1932,6 +1943,7 @@
              token_limit=max(0, _clamp_int(getattr(tasks_cfg, "token_limit", 2_000_000), 0, 10**9, 2_000_000)),
              run_seconds=max(0, _clamp_int(getattr(tasks_cfg, "run_seconds", 10800), 0, 30 * 86400, 10800)),
          ),

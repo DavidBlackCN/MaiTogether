@@ -24,6 +24,41 @@ def life(available=True):
         'snapshot_valid_until':(datetime.now(timezone.utc)+timedelta(seconds=5)).isoformat()}}
 
 
+@pytest.mark.asyncio
+async def test_weave_admission_without_vita_and_without_send_permission():
+    now=datetime.now(timezone.utc)
+    state={'version':1,'ready':True,'enabled':True,'schedule_enabled':False,
+        'updated_at':now.isoformat(),'sleeping':False,'awake_until':None,'current':None}
+    host=SimpleNamespace(_call=AsyncMock(return_value=state))
+    app=app_for(host,{'groups':{'serve':[{'group':'qq:'+GID}]},'together':{'life_provider':'maiweave'}})
+    assert await app.together.available(GID)
+    assert await app.together.available()  # global background admission, not a fabricated group
+    assert all(call.kwargs['api_name']=='ilworkcn.maiweave.get_life_status' for call in host._call.call_args_list)
+    assert not await app.together.can_publish()
+    host._call.reset_mock()
+    assert not await app.together.available('outside')
+    host._call.assert_not_called()
+    for changes in ({'ready':False},{'enabled':False},{'version':2},
+                    {'schedule_enabled':True},{'updated_at':(now-timedelta(minutes=10)).isoformat()}):
+        host._call.return_value={**state,**changes}
+        assert not await app.together.available(GID)
+    host._call.return_value={**state,'current':{'id':'work','kind':'work','status':'active',
+        'start':(now-timedelta(minutes=1)).isoformat(),'end':(now+timedelta(minutes=1)).isoformat()}}
+    assert not await app.together.available(GID)
+    app.together._active_tasks.add('approved')
+    await app.together.model_guard(GID,'approved')
+    with pytest.raises(Exception): await app.together.model_guard(GID,'new')
+    host._call.side_effect=TimeoutError()
+    assert not await app.together.available(GID)
+    assert all(call.kwargs['api_name']=='ilworkcn.maiweave.get_life_status' for call in host._call.call_args_list)
+
+
+def test_shared_life_rules_are_bundled_verbatim():
+    import CharTyr_MaiWork.maiwork.life_status as shared
+    original=Path(__file__).parents[3]/'host/src/plugin_runtime/behavior_policy/life_status.py'
+    assert Path(shared.__file__).read_bytes()==original.read_bytes()
+
+
 def test_recommended_config_is_valid():
     import tomllib
     raw=tomllib.loads((Path(__file__).parents[1]/'recommended.toml').read_text(encoding='utf-8'))

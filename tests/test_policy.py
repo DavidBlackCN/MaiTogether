@@ -40,7 +40,7 @@ async def test_one_final_check_and_quota_under_concurrency():
     args = {**t, 'connection': 'one', 'digest': 'same'}
     results = await asyncio.gather(*(p.final(ADAPTER, args) for _ in range(12)))
     assert sum(r['allowed'] for r in results) == 1
-    assert calls == ['vita', 'hush']
+    assert calls == ['life', 'hush']
 
 
 @pytest.mark.asyncio
@@ -53,7 +53,7 @@ async def test_sleep_before_final_denies_without_consuming_hush():
     p._provider = provider
     t = await ticket(p)
     result = await p.final(ADAPTER, {**t, 'connection': 'one', 'digest': 'same'})
-    assert not result['allowed'] and calls == ['vita']
+    assert not result['allowed'] and calls == ['life']
 
 
 @pytest.mark.asyncio
@@ -117,7 +117,7 @@ def test_required_provider_configuration_is_explicit_and_ordered():
     with pytest.raises(ValueError): BehaviorPolicy({'enabled':True,'targets':[]})
     target={**ROUTE,'providers':['hush','vita']}
     p=BehaviorPolicy({'enabled':True,'targets':[target]})
-    assert p.targets[0]['providers']==['vita','hush']
+    assert p.targets[0]['providers']==['life','hush']
     with pytest.raises(ValueError): BehaviorPolicy({'enabled':True,'targets':[target,target]})
 
 

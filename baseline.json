@@ -1,5 +1,5 @@
 {
-  "adaptation_version": "0.3.0",
+  "adaptation_version": "0.3.2",
   "contract_version": 1,
   "host": {
     "commit": "c6429547af711555e3d4d1b8d04b413572cb616c",

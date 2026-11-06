@@ -32,11 +32,11 @@ async def pause_reason(session_id):
                  scope=session.scope, chat_type='group' if session.group_id else 'private',
                  target_id=str(session.group_id or session.user_id))
     target = policy.target(route)
-    if target is None or 'vita' not in target['providers']:
+    if target is None or 'life' not in target['providers']:
         return ''
     try:
         async with asyncio.timeout(.3):
-            result = await policy._provider('vita', dict(
+            result = await policy._provider('life', dict(
                 category='cognition', action='host.cognition', stream_id=session_id,
                 route=route, origin={'kind': 'host'}))
         return result.get('reason', 'unavailable') if result['decision'] == 'deny' else ''

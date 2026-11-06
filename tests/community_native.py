@@ -163,7 +163,7 @@ async def run_cases(values):
             await c.sleeping()
         finally: release.set()
         await pending
-        assert any(e['reason']=='vita:sleeping' for e in list(policy.audit)[audit_before:])
+        assert any(e['reason']=='life:sleeping' for e in list(policy.audit)[audit_before:])
         mark('cateye_prepared_while_awake_but_sleep_before_submission',before,0)
         assert (await c.command('/maivita wake'))[0]
         assert (await c.supervisor.unload_plugins([VITA],reason='community-provider-loss')).success

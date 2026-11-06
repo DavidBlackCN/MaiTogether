@@ -62,7 +62,7 @@ def promote(args):
     validation = json.loads((folder / 'validation.json').read_text(encoding='utf-8'))
     pins = json.loads((folder / 'candidate.json').read_text(encoding='utf-8'))
     if (not report['applicable'] or not validation.get('passed')
-            or {item['name'] for item in validation.get('checks', []) if item['exit_code'] == 0} != REQUIRED_CHECKS
+            or not REQUIRED_CHECKS <= {item['name'] for item in validation.get('checks', []) if item['exit_code'] == 0}
             or validation.get('candidate') != pins
             or report['inputs_digest'] != inputs_digest()
             or validation.get('inputs_digest') != inputs_digest()):

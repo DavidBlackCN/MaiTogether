@@ -1,0 +1,10 @@
+{
+  "repository": "https://github.com/ilworkcn/MaiWeave",
+  "branch": "main",
+  "commit": "70976f517c051a8b341f81aca3dfffbc1e1990e7",
+  "version": "0.9.0",
+  "api": "get_life_status",
+  "api_version": "1",
+  "production_ready": false,
+  "blocker": "Scheduled idle and expired temporary waking cannot be distinguished by the current API. Both are denied."
+}

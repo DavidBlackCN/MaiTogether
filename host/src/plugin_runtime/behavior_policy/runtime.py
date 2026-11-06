@@ -1,5 +1,6 @@
 """Host policy composition. No platform network calls occur inside the final check."""
 from collections import deque
+from copy import deepcopy
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict
@@ -13,10 +14,10 @@ import time
 from .actions import MESSAGE_TARGET, category, fingerprint, text_digest
 from .context import contexts, current, outbound, provider_request, live
 from .build_features import FEATURES
+from .life import LifeProvider
 
 ADAPTER = 'maibot-team.snowluma-adapter'
 PROVIDERS = {
-    'vita': 'davidblackcn.maibot-maivita-plugin',
     'hush': 'davidblackcn.maibot-maihush-plugin',
     'identity': 'davidblackcn.maibot-maiidentity-plugin',
 }
@@ -45,7 +46,8 @@ class BehaviorPolicy:
         if type(config.get('enabled', False)) is not bool:
             raise ValueError('behavior_control.enabled must be boolean')
         self.enabled = config.get('enabled', False)
-        self.targets = config.get('targets', [])
+        self.life = LifeProvider.from_config(config)
+        self.targets = deepcopy(config.get('targets', []))
         self.management = config.get('management_commands', [])
         if self.enabled and not self.targets:
             raise ValueError('Enabled behavior control requires explicit targets')
@@ -53,13 +55,12 @@ class BehaviorPolicy:
         for target in self.targets:
             if (not all(target.get(k) for k in ('platform', 'account_id', 'chat_type', 'target_id'))
                     or target['chat_type'] not in ('group', 'private')
-                    or not isinstance(target.get('providers'), list)
-                    or not target['providers'] or any(p not in ('vita','hush') for p in target['providers'])):
+                    or not isinstance(target.get('providers'), list)):
                 raise ValueError('Invalid behavior target/providers')
             key=tuple(target.get(k) or None for k in ('platform','account_id','scope','chat_type','target_id'))
             if key in seen: raise ValueError('Duplicate behavior target')
             seen.add(key)
-            target['providers']=[p for p in ('vita','hush') if p in target['providers']]
+            target['providers'] = self.life.normalize(target['providers'])
         self.actions: Dict[str, Dict[str, Any]] = {}
         self.audit = deque(maxlen=1024)
         self.manager = None
@@ -93,6 +94,8 @@ class BehaviorPolicy:
                 'request': request}
 
     async def _provider(self, name, request):
+        if name == 'life':
+            return await self.life.evaluate(self.manager, request)
         if self.manager is None:
             raise RuntimeError('BEHAVIOR_RUNTIME_UNAVAILABLE')
         plugin = PROVIDERS[name]

@@ -10,13 +10,17 @@ from assembly import CONTROL, PROFILES, hashes, inputs_digest
 
 CORE_PLUGINS = ('maibot-maivita-plugin', 'maibot-maihush-plugin', 'maibot-maiIdentity-plugin')
 REQUIRED_CHECKS = {'unit', 'adapter', 'full-control', 'full-community', 'full-sleep',
-                   'behavior-control', 'behavior-community', 'sleep-sleep', *CORE_PLUGINS}
+                   'behavior-control', 'behavior-community', 'sleep-sleep',
+                   'full-life', 'behavior-life', 'sleep-life', 'full-generic-control',
+                   'full-generic-sleep', *CORE_PLUGINS}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--candidate', type=Path, required=True)
     parser.add_argument('--workspace', type=Path, required=True)
+    parser.add_argument('--maiweave', type=Path, help='Reviewed latest source for no-Vita acceptance on all build profiles')
+    parser.add_argument('--maiwork', type=Path, help='Built adaptation; enables work unit and native tests')
     args = parser.parse_args()
     folder = args.candidate.resolve()
     evidence = folder / 'validation'
@@ -43,13 +47,39 @@ def main():
             if mode != 'control':
                 command.append('--' + mode)
             commands.append((profile + '-' + mode, command))
+    for profile, mode, flags in (
+        ('full', 'life', ['--life-provider']),
+        ('behavior', 'life', ['--life-provider']),
+        ('sleep', 'life', ['--life-provider']),
+        ('full', 'generic-control', ['--generic-life-config']),
+        ('full', 'generic-sleep', ['--generic-life-config', '--sleep']),
+    ):
+        commands.append((profile + '-' + mode, [sys.executable, str(CONTROL / 'tools/run_native.py'),
+            '--workspace', str(args.workspace.resolve()), '--host', str(folder / profile / 'host'),
+            '--adapter', str(folder / profile / 'adapter'),
+            '--output', str(evidence / (profile + '-' + mode)), *flags]))
     commands.append(('adapter', [sys.executable, str(CONTROL / 'tools/test_adapter.py'),
                                 '--adapter', str(folder / 'full/adapter'), '--temp', str(evidence / 'adapter-pytest')]))
+    if args.maiweave:
+        for profile in PROFILES:
+            command=[sys.executable,str(CONTROL/'tools/run_native.py'),'--workspace',str(args.workspace.resolve()),
+                '--host',str(folder/profile/'host'),'--adapter',str(folder/profile/'adapter'),
+                '--maiweave',str(args.maiweave.resolve()),'--output',str(evidence/(profile+'-weave'))]
+            if profile=='full' and args.maiwork: command+=['--maiwork',str(args.maiwork.resolve())]
+            commands.append((profile+'-weave',command))
+    if args.maiwork:
+        commands.append(('maiwork-unit',[sys.executable,str(CONTROL/'integrations/maiwork/tests/run.py'),
+            '--source',str(args.maiwork.resolve()),'--output',str(evidence/'maiwork-unit')]))
+        commands.append(('maiwork-vita',[sys.executable,str(CONTROL/'tools/run_native.py'),
+            '--workspace',str(args.workspace.resolve()),'--host',str(folder/'full/host'),
+            '--adapter',str(folder/'full/adapter'),'--maiwork',str(args.maiwork.resolve()),
+            '--output',str(evidence/'maiwork-vita')]))
     for name in CORE_PLUGINS:
         commands.append((name, [sys.executable, '-m', 'pytest', 'tests', '-q', '-p', 'no:cacheprovider',
                                 '--basetemp=' + str(evidence / (name + '-pytest')),
                                 '-o', 'asyncio_default_fixture_loop_scope=function']))
-    report = {'candidate': pins, 'inputs_digest': inputs_digest(), 'checks': [], 'passed': False}
+    report = {'candidate': pins, 'inputs_digest': inputs_digest(), 'checks': [], 'passed': False,
+              'requested_checks':[name for name,_ in commands]}
     env = dict(os.environ, PYTHONUTF8='1', PYTHONDONTWRITEBYTECODE='1',
                MAITOGETHER_TEST_HOST=str(folder / 'full/host'))
     try:

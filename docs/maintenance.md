@@ -12,6 +12,8 @@ MaiTogether 跟进 MaiBot 官方正式稳定版。`baseline.json` 记录当前�
 | `patches/host/behavior.patch`、`patches/adapter/behavior.patch` | 发送检查、结果记录与安全 Hook 处理 |
 | `patches/host/sleep.patch` | 睡眠时暂停聊天生成，过滤自动记忆 |
 | `baseline.json`、`locks/` | 官方提交与各构建组合的文件校验值 |
+| `integrations/maiweave/` | MaiWeave 已审查的源码提交与接口记录 |
+| `integrations/maiwork/` | MaiWork 适配补丁、构建工具与推荐配置 |
 | `tools/`、`tests/` | 构建、升级、测试和备份工具 |
 
 真实账号配置、数据库、日志、环境和内部测试报告不进入源码仓库。官方文件的具体修改位置见[补丁边界](patches.md)。
@@ -36,7 +38,7 @@ python tools/build.py --host-source ../upstream/MaiBot --adapter-source ../upstr
 
 ```bash
 python tools/upgrade.py check --host-source ../upstream/MaiBot --sdk-source ../upstream/maibot-plugin-sdk --adapter-source ../upstream/MaiBot-SnowLuma-Adapter --output ../upgrade-candidate
-python tools/validate.py --candidate ../upgrade-candidate --workspace ..
+python tools/validate.py --candidate ../upgrade-candidate --workspace .. --maiweave ../upstream/MaiWeave --maiwork ../MaiWork-adapted
 python tools/upgrade.py promote --candidate ../upgrade-candidate
 ```
 
@@ -48,31 +50,30 @@ python tools/upgrade.py promote --candidate ../upgrade-candidate
 
 ## 隔离回归的准备
 
-联合测试需要 Super MaiMai 工作区布局：同级的 Vita、Hush、Identity、Coordinate 源码，以及 `.implementation/vendor/smart_poke_plugin`、`.implementation/vendor/Cateye-audit` 中的固定社区源码。版本见来源说明。Python 环境需安装 Host、SDK、核心插件测试依赖；SDK 必须与候选版本一致。
+MaiWeave 联调需要 Super MaiMai 工作区中同级的 Hush、Identity 源码，以及 `.implementation/vendor/smart_poke_plugin`、`.implementation/vendor/Cateye-audit` 中的社区源码。另行准备已审查的 MaiWeave 源码和已构建的 MaiWork 适配目录。Python 环境需安装 Host、SDK 及参测插件依赖；SDK 必须与候选版本一致。
 
-`validate.py` 会测试默认组合及两个独立组合，实际加载 Host、Runner、SDK 和原版社区插件。QQ、模型使用本地替身，测试进程禁止外网连接。结果和日志保存在候选目录，不混入本仓库。
+`validate.py` 会测试完整构建及两个独立构建，实际加载 Host、Runner、SDK 和原版社区插件；传入 `--maiweave`、`--maiwork` 后加入对应联调。完整矩阵还保留 Vita 兼容回归，因此需同级的 Vita、Coordinate 源码。QQ、模型使用本地替身，测试进程禁止外网连接。结果和日志保存在候选目录。
 
 单独定位问题时可运行：
 
 ```bash
-python tools/run_native.py --workspace .. --host ../control-build/host --adapter ../control-build/adapter
-python tools/run_native.py --community --workspace .. --host ../control-build/host --adapter ../control-build/adapter
-python tools/run_native.py --sleep --workspace .. --host ../control-build/host --adapter ../control-build/adapter
+python tools/run_native.py --workspace .. --host ../control-build/host --adapter ../control-build/adapter --maiweave ../upstream/MaiWeave --maiwork ../MaiWork-adapted
 ```
 
 当前原生验收在 Windows 上执行。真实 QQ、SnowLuma、Linux 服务器和长期运行仍需另测；替身不验证真实模型的工具选择和生成质量。
 
-### Vita 生活页面与聊天频率
+进程成功退出后才生成 `acceptance.json`；单独存在 `result.json` 不代表整组通过。`sources.json` 记录参测文件哈希，页面截图与日志保留在同一临时目录。
 
-这组测试还需要工作区 `tools/vita_next_native.py`、[固定版本日期插件](calendar.md)的源码（放在 `.implementation/vendor/date_context_plugin`），以及官方 `maibot-dashboard==1.9.13`、`cnlunar==0.2.4`、`chinese-calendar`、`playwright` 和 Chromium。不需要另行编译前端。
+## Life Provider 验证
+
+`tools/validate.py` 包含旧 Vita 配置、新 `life` 配置，以及完整／仅行为／仅睡眠构建的 Provider 测试。单独运行：
 
 ```bash
-python tools/run_native.py --vita-next --workspace .. --browser /path/to/chromium
+python tools/run_native.py --life-provider --workspace .. --host ../control-build/host --adapter ../control-build/adapter
+python tools/run_native.py --generic-life-config --sleep --workspace .. --host ../control-build/host --adapter ../control-build/adapter
 ```
 
-它会启动真实 WebUI 和 Runner，实际操作三个页面、睡眠与唤醒、生成参考计划、保存配置，并检查群聊倍率及卸载恢复。测试使用真实的一分钟决策冷却，通常需要数分钟。浏览器及模型只访问本机替身，测试账户与配置临时生成。
-
-进程成功退出后才生成 `acceptance.json`；单独存在 `result.json` 不代表整组通过。`sources.json` 记录参测文件哈希，页面截图与日志保留在同一临时目录。
+独立测试 Provider 只存在于验收插件中：测试会卸载 Vita，验证其他插件 ID 和处理函数可工作，再检查超时、错误版本、非私有接口、卸载和恢复。它不代表 MaiWeave 实现。测试实例及结果使用独立输出目录，不覆盖运行实例。
 
 ## 修改补丁与打包
 
@@ -82,7 +83,13 @@ python tools/run_native.py --vita-next --workspace .. --browser /path/to/chromiu
 python tools/export_patches.py --host-source ../upstream/MaiBot --adapter-source ../upstream/MaiBot-SnowLuma-Adapter --host-working ../working/host --adapter-working ../working/adapter --output ../rebuilt
 ```
 
-导出后必须重新构建并回归。该命令更新补丁和校验值，本身不证明功能正确。`tools/package.py` 可从工作区打包完整源码和核心插件，要求核心插件仓库干净；Coordinate 使用 Vita 仓库中的同步版本。
+导出后必须重新构建并回归。该命令更新补丁和校验值，本身不证明功能正确。打包 MaiWeave 组合时执行：
+
+```bash
+python tools/package.py --workspace .. --output ../MaiTogether-package --maiweave-source ../upstream/MaiWeave --maiwork-source ../upstream/MaiWork
+```
+
+要求核心插件仓库干净、MaiWeave 提交与审查记录一致。包内包含完整源码、版本和文件哈希，不包含运行配置与数据库。工具不传 `--maiweave-source` 时保留 Vita／Coordinate 兼容组合的打包方式。
 
 ## 备份和恢复
 

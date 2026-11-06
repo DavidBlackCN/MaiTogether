@@ -6,7 +6,7 @@
 
 1. 停止 MaiBot，备份现有代码、插件、配置和数据。
 2. 使用本项目构建的 Host 和连接器。源码构建方法见[维护说明](maintenance.md#从源码构建)。已有组装包时，`host/` 是主程序，`adapter/` 是要安装的连接器插件。
-3. 按 MaiBot 的安装方式准备 Python 环境，安装 Host 依赖和固定版本 SDK。将连接器与 MaiVita、MaiHush、MaiIdentity 放入实例插件目录；同一插件只保留一份。MaiCoordinate 按需安装。
+3. 按 MaiBot 的安装方式准备 Python 环境，安装 Host 依赖和固定版本 SDK。将连接器与 MaiWeave、MaiHush、MaiIdentity 放入实例插件目录；同一插件只保留一份。
 4. 按各插件 README 设置管理员和管理范围。先确认基础插件可以正常加载，再添加社区插件。
 5. 填写下面的行为控制配置，重启 MaiBot。
 
@@ -21,24 +21,25 @@
 | 字段 | 填写方法 |
 | --- | --- |
 | `enabled` | `true` 开启；`false` 关闭 |
+| `life_provider` | 保留示例中的 MaiWeave 接口设置；状态规则见 [MaiWeave 配置](maiweave.md) |
 | `targets` | 要管理的会话列表，每个群或私聊单独一项 |
 | `platform` | QQ 填 `"qq"` |
 | `account_id` | 机器人自己的 QQ 号，使用字符串 |
 | `scope` | 与连接器的同名设置一致；连接器未设置时填 `null` |
 | `chat_type` | 群聊填 `"group"`，私聊填 `"private"` |
 | `target_id` | 群号或私聊对象的 QQ 号，使用字符串 |
-| `providers` | 群聊通常填 `["vita", "hush"]`；私聊可填 `["vita"]` |
+| `providers` | 群聊通常填 `["life", "hush"]`；私聊可填 `["life"]` |
 | `autonomous_plugins` | 允许在该会话后台自动行动的插件 ID，见下一节 |
 | `cross_target_plugins` | 允许从其他会话发起动作的插件 ID，通常保持 `[]` |
 | `management_commands` | 允许执行 QQ 群管理动作的命令列表，通常保持 `[]` |
 
-生活与静音检查针对 `targets` 中列出的会话，账号、群号和 `scope` 必须匹配。开启控制后，未知动作、敏感读取和未授权管理操作仍会拒绝，不因目标未列入名单而自动放行。Vita、Hush 自己的管理范围也要包含相应会话；插件明确不管理某个会话时，不会替它施加限制。
+生活与静音检查针对 `targets` 中列出的会话，账号、群号和 `scope` 必须匹配。MaiWeave 提供全局生活状态，Hush 的受管群也须包含对应群号。开启控制后，未知动作、敏感读取和未授权管理操作仍会拒绝，不因目标未列入名单而自动放行。
 
 配置文件不存在时，这项功能默认关闭，核心插件仍按各自原有方式工作。开启后，必要插件加载失败或状态查询超时，会暂停相关动作。
 
 ## 允许自动行动的插件
 
-示例文件已列入 Coordinate、Hush 和 Smart Poke。只保留你需要自动行动的插件；名单中的 ID 来自插件的 `_manifest.json`，不是文件夹名。
+示例文件已列入 MaiWeave、Hush 和 Smart Poke。只保留你需要自动行动的插件；名单中的 ID 来自插件的 `_manifest.json`，不是文件夹名。各插件自己的主动功能仍需分别开启。
 
 如果启用 Cateye 的自动贴表情，将 `github.cateye.set-msg-emoji-like` 加入对应会话的 `autonomous_plugins`。同时按 Cateye 自身配置开启自动功能。
 
@@ -62,7 +63,7 @@
 
 **插件为什么不回应？**
 
-先确认 Vita 是否在睡眠或忙碌、Hush 是否已静音，再检查自动行动名单与会话配置。日志中的 `behavior_control` 会记录拒绝原因。必要插件缺失或超时也会阻止发送，不应通过关闭检查来解决加载问题。
+先确认 MaiWeave 的生活状态、Hush 是否已静音，再检查自动行动名单与会话配置。日志中的 `behavior_control` 会记录拒绝原因。`sleep_state_ambiguous` 表示当前接口无法确定是否应继续睡眠，`life_state_stale` 表示生活状态长时间未更新。必要插件缺失或超时也会阻止发送，应先排查插件加载和运行情况。
 
 **为什么发文件或多条消息时，只发出了一部分？**
 
@@ -70,4 +71,4 @@
 
 **QQ 空间是否也受这份配置管理？**
 
-不受。空间功能通过 Coordinate 和 MaiTrace 的配套配置管理，不能依赖这里的群静音或 QQ 发送检查。
+不受。这里检查标准消息和官方 QQ 连接器的动作；QQ 空间使用独立协议，需要相应插件自行检查状态与权限。

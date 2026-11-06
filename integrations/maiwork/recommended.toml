@@ -5,6 +5,8 @@ config_version = "0.5.4"
 
 [together]
 enabled = true
+life_provider = "maiweave"
+life_max_age_seconds = 180
 public_publish = false
 
 [groups]

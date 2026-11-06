@@ -21,6 +21,7 @@ PROBE='test.behavior-probe'
 
 
 async def run(work):
+    weave = os.environ.get('MAIWEAVE_TEST') == '1'
     from src.config.config import config_manager
     config_manager.initialize()
     cfg=config_manager.get_global_config()
@@ -92,6 +93,14 @@ async def run(work):
     if os.environ.get('MAIWORK_TEST')=='1':
         from maiwork_native import configure
         configure(work, configs, port)
+    if weave:
+        configs.pop('maibot-maivita-plugin')
+        configs.pop('maibot-maicoordinate-plugin')
+        configs['maiweave'] = {'plugin': {'enabled': True, 'config_version': '0.9.0'},
+            'life': {'enabled': True, 'autonomous': False, 'model_task': 'test'},
+            'world': {'weather_enabled': False, 'news_enabled': False, 'search_enabled': False, 'places_enabled': False},
+            'proactive': {'enabled': False}, 'memory': {'enabled': False}}
+        if 'maiwork' in configs: configs['maiwork']['together']['life_provider'] = 'maiweave'
     for folder,config in configs.items():
         (work/'plugins'/folder/'config.toml').write_text(tomli_w.dumps(config),encoding='utf-8')
     if os.environ.get('MAIVITA_NEXT_TEST')=='1':
@@ -99,7 +108,13 @@ async def run(work):
         configure(work,configs,stream)
     (work/'behavior.json').write_text(json.dumps({'enabled':True,'targets':[{
         'platform':'qq','account_id':'123456789','scope':None,'chat_type':'group','target_id':'987654321',
-        'providers':['vita','hush'],'autonomous_plugins':[PROBE,POKE,CATEYE,ADAPTER,COORD,HUSH]+(['chartyr.maiwork'] if os.environ.get('MAIWORK_TEST')=='1' else [])}]}),encoding='utf-8')
+        'providers':['life' if os.environ.get('MAIBOT_GENERIC_LIFE_CONFIG')=='1' else 'vita','hush'],'autonomous_plugins':[PROBE,POKE,CATEYE,ADAPTER,COORD,HUSH]+(['chartyr.maiwork'] if os.environ.get('MAIWORK_TEST')=='1' else [])}]}),encoding='utf-8')
+    if weave:
+        behavior=json.loads((work/'behavior.json').read_text())
+        behavior['targets'][0]['providers']=['life','hush']
+        behavior['targets'][0]['autonomous_plugins'].append('ilworkcn.maiweave')
+        behavior['life_provider']={'plugin_id':'ilworkcn.maiweave','api':'get_life_status','version':'1','protocol':'maiweave_status_v1'}
+        (work/'behavior.json').write_text(json.dumps(behavior),encoding='utf-8')
     from src.plugin_runtime.integration import get_plugin_runtime_manager
     from src.plugin_runtime.host.supervisor import PluginSupervisor
     from src.plugin_runtime.behavior_policy.runtime import get_policy
@@ -178,6 +193,10 @@ async def run(work):
     cases=[]
     try:
         await supervisor.start()
+        if weave:
+            from weave_native import run_cases
+            await run_cases(locals())
+            return
         assert {VITA,HUSH,IDENTITY,COORD,ADAPTER,POKE,CATEYE,PROBE} <= set(supervisor._registered_plugins),supervisor._registered_plugins
         for plugin in (VITA,HUSH,IDENTITY,COORD,ADAPTER,POKE,CATEYE):
             inspected=await supervisor.inspect_plugin_config(plugin)
@@ -187,6 +206,10 @@ async def run(work):
             life=await call(VITA,'get_life_state')
             return bool(drivers) and life.get('ok')
         await wait(ready)
+        if os.environ.get('MAIBOT_LIFE_TEST')=='1':
+            from life_native import run_cases
+            await run_cases(locals())
+            return
         if os.environ.get('MAIWORK_TEST')=='1':
             from maiwork_native import run_cases
             await run_cases(locals())
@@ -343,7 +366,7 @@ async def run(work):
         assert await supervisor.reload_plugins([VITA],reason='busy-fixture')
         before=len(writes)
         assert not (await probe('api'))['success'] and len(writes)==before
-        assert get_policy().audit[-1]['reason']=='vita:busy'
+        assert get_policy().audit[-1]['reason']=='life:busy'
         vita_config.pop('availability')
         (work/'plugins/maibot-maivita-plugin/config.toml').write_text(tomli_w.dumps(vita_config),encoding='utf-8')
         assert await supervisor.reload_plugins([VITA],reason='busy-fixture-end')
@@ -361,7 +384,7 @@ async def run(work):
         entered=asyncio.Event(); release=asyncio.Event(); held=False
         async def held_provider(name,request):
             nonlocal held
-            if name=='vita' and not held:
+            if name=='life' and not held:
                 held=True; entered.set(); await release.wait()
             return await original_provider(name,request)
         policy._provider=held_provider
@@ -385,7 +408,7 @@ async def run(work):
         before=len(writes)
         slow_provider=policy._provider
         async def timeout_provider(name,request):
-            if name=='vita': await asyncio.sleep(.4)
+            if name=='life': await asyncio.sleep(.4)
             return await slow_provider(name,request)
         policy._provider=timeout_provider
         try: assert not (await probe('api'))['success']

@@ -1,5 +1,12 @@
 {
   "enabled": true,
+  "life_provider": {
+    "plugin_id": "ilworkcn.maiweave",
+    "api": "get_life_status",
+    "version": "1",
+    "protocol": "maiweave_status_v1",
+    "max_age_seconds": 180
+  },
   "targets": [
     {
       "platform": "qq",
@@ -7,9 +14,9 @@
       "scope": null,
       "chat_type": "group",
       "target_id": "987654321",
-      "providers": ["vita", "hush"],
+      "providers": ["life", "hush"],
       "autonomous_plugins": [
-        "davidblackcn.maibot-maicoordinate-plugin",
+        "ilworkcn.maiweave",
         "davidblackcn.maibot-maihush-plugin",
         "TAIY2020.smart_poke_plugin"
       ],

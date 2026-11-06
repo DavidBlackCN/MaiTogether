@@ -8,6 +8,7 @@ import subprocess
 import zipfile
 
 ROOT = Path(__file__).resolve().parent
+LIFE_STATUS = ROOT.parents[1] / 'host/src/plugin_runtime/behavior_policy/life_status.py'
 
 
 def build(source, output, *, patch=True):
@@ -36,10 +37,14 @@ def build(source, output, *, patch=True):
             if dest.exists(): raise ValueError('Upstream now owns adaptation module: '+str(dest))
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(p.read_bytes())
+        shared = output / 'maiwork/life_status.py'
+        if shared.exists(): raise ValueError('Upstream now owns '+str(shared))
+        shared.write_bytes(LIFE_STATUS.read_bytes())
         files = {p.relative_to(output).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                  for p in sorted(output.rglob('*')) if p.is_file()}
         inputs = {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                   for p in [ROOT/'maiwork.patch', *sorted((ROOT/'modules').rglob('*.py'))]}
+        inputs['shared/life_status.py'] = hashlib.sha256(LIFE_STATUS.read_bytes()).hexdigest()
         (output/'maitogether-build.json').write_text(json.dumps({'baseline':pin,'inputs':inputs,'files':files},indent=2)+'\n',encoding='utf-8')
     return output
 
