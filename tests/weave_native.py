@@ -4,7 +4,9 @@ import os
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from native_scenario import VITA, COORD, HUSH, IDENTITY, POKE, CATEYE, ADAPTER
+from native_scenario import HUSH, IDENTITY, POKE, CATEYE, ADAPTER
+VITA='davidblackcn.maibot-maivita-plugin'
+COORD='davidblackcn.maibot-maicoordinate-plugin'
 
 WEAVE='ilworkcn.maiweave'
 WORK='chartyr.maiwork'

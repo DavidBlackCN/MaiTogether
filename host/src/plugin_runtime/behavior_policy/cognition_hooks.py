@@ -31,7 +31,7 @@ async def run_focus_turn(group):
     try:
         await group._run_turn()
     except CognitionPaused:
-        group._take_ready_inputs()
+        group._take_pending_inputs()
         for entry in group.entries:
             for session, sequence in entry.progress.items():
                 group._considered[session] = max(group._considered.get(session, 0), sequence)

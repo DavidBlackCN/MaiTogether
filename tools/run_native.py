@@ -14,18 +14,13 @@ ROOT = Path(__file__).resolve().parents[2]
 CONTROL = Path(__file__).resolve().parents[1]
 
 
-def stage(work, adapter_source, workspace, pins, vita_next=False, maiweave=None):
-    sources = {name: workspace / name for name in ('maibot-maivita-plugin', 'maibot-maihush-plugin',
-                'maibot-maiIdentity-plugin', 'maibot-maicoordinate-plugin')}
+def stage(work, adapter_source, workspace, pins, maiweave=None):
+    sources = {name: workspace / name for name in ('maibot-maihush-plugin', 'maibot-maiIdentity-plugin')}
     sources.update(adapter=adapter_source,
                    poke=workspace / '.implementation/vendor/smart_poke_plugin',
                    cateye=workspace / '.implementation/vendor/Cateye-audit')
     if maiweave:
-        sources.pop('maibot-maivita-plugin')
-        sources.pop('maibot-maicoordinate-plugin')
         sources['maiweave'] = maiweave
-    if vita_next:
-        sources['date']=workspace/'.implementation/vendor/date_context_plugin'
     evidence = {}
     for name, source in sources.items():
         target = work / 'plugins' / name
@@ -50,6 +45,13 @@ def stage(work, adapter_source, workspace, pins, vita_next=False, maiweave=None)
         host_application={'min_version':pins['host']['tag'].removeprefix('v'),'max_version':pins['host']['tag'].removeprefix('v')},
         sdk={'min_version':pins['sdk']['tag'].removeprefix('v'),'max_version':pins['sdk']['tag'].removeprefix('v')}, plugin_type='extension',
         capabilities=['send.text','send.emoji','send.custom','api.call','llm.generate','behavior.check'])), encoding='utf-8')
+    if not maiweave:
+        fixture = work / 'plugins/life-fixture'
+        fixture.mkdir()
+        shutil.copyfile(CONTROL / 'tests/fixture_life_plugin.py', fixture / 'plugin.py')
+        manifest = json.loads((probe / '_manifest.json').read_text(encoding='utf-8'))
+        manifest.update(id='test.life-provider', name='Synthetic life state', capabilities=[])
+        (fixture / '_manifest.json').write_text(json.dumps(manifest), encoding='utf-8')
     if maiweave:
         target = work/'plugins/maiweave'
         shutil.copyfile(CONTROL/'tests/weave_probe.py', target/'acceptance_probe.py')
@@ -62,6 +64,9 @@ def stage(work, adapter_source, workspace, pins, vita_next=False, maiweave=None)
         entry.write_text(text.replace(old, 'from .acceptance_probe import AcceptanceProbe\n\nclass MaiWeavePlugin(AcceptanceProbe, WebUI, FeatureTools, MaiBotPlugin):'), encoding='utf-8')
         for path in target.rglob('*'):
             if path.is_file(): evidence['maiweave/'+path.relative_to(target).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+    for path in (work / 'plugins').rglob('*'):
+        if path.is_file():
+            evidence[path.relative_to(work / 'plugins').as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
     (work / 'sources.json').write_text(json.dumps(evidence, indent=2), encoding='utf-8')
 
 
@@ -74,12 +79,11 @@ def main():
     parser.add_argument('--community',action='store_true',help='Focused unchanged-community plugin acceptance')
     parser.add_argument('--sleep',action='store_true',help='Sleeping cognition and automatic memory acceptance')
     parser.add_argument('--life-provider',action='store_true',help='Generic Life Provider and unavailable-backend acceptance')
-    parser.add_argument('--generic-life-config',action='store_true',help='Use the life selector with the default Vita backend')
-    parser.add_argument('--vita-next',action='store_true',help='Life WebUI, calendar and frequency acceptance')
     parser.add_argument('--maiwork',type=Path,help='Assembled MaiWork adaptation for isolated acceptance')
     parser.add_argument('--maiweave',type=Path,help='Latest reviewed MaiWeave source; Vita and Coordinate are not installed')
-    parser.add_argument('--browser',type=Path,help='Chromium executable for isolated browser acceptance')
     args = parser.parse_args()
+    if args.maiwork and not args.maiweave:
+        parser.error("--maiwork requires --maiweave; the Vita matrix is retired")
     weave_pin = None
     if args.maiweave:
         weave_pin=json.loads((CONTROL/'integrations/maiweave/baseline.json').read_text(encoding='utf-8'))
@@ -95,9 +99,9 @@ def main():
         raise RuntimeError('Installed SDK does not match the candidate baseline')
     work = (args.output or ROOT / ('.implementation/behavior-control/native-' + str(time.time_ns()))).resolve()
     work.mkdir(parents=True, exist_ok=False)
-    if args.maiweave and any((args.vita_next,args.life_provider,args.sleep,args.community)):
+    if args.maiweave and any((args.life_provider,args.sleep,args.community)):
         parser.error('--maiweave selects its own acceptance scenario')
-    stage(work,args.adapter.resolve(),args.workspace.resolve(),pins,args.vita_next,args.maiweave)
+    stage(work,args.adapter.resolve(),args.workspace.resolve(),pins,args.maiweave)
     if args.maiwork:
         shutil.copytree(args.maiwork, work/'plugins/maiwork', ignore=shutil.ignore_patterns(
             '.git','__pycache__','tests','docs','config.toml'))
@@ -125,19 +129,16 @@ def main():
         MAIBOT_COMMUNITY_TEST=str(int(args.community)),
         MAIBOT_SLEEP_TEST=str(int(args.sleep)),
         MAIBOT_LIFE_TEST=str(int(args.life_provider)),
-        MAIBOT_GENERIC_LIFE_CONFIG=str(int(args.generic_life_config)),
-        MAIVITA_NEXT_TEST=str(int(args.vita_next)),
         MAIWORK_TEST=str(int(bool(args.maiwork))),
         MAIWEAVE_TEST=str(int(bool(args.maiweave))),
         MAIBOT_WEBUI_USE_LOCAL_DASHBOARD='1',
         MAIBOT_BEHAVIOR_CONFIG=str(work / 'behavior.json'), TEMP=str(work), TMP=str(work), USERPROFILE=str(work))
-    if args.browser:env['MAIVITA_BROWSER']=str(args.browser.resolve())
     with (work / 'console.log').open('wb') as log:
         process = subprocess.Popen([sys.executable, '-m', 'native_scenario'], cwd=work, env=env, stdout=log,
             stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
         print(json.dumps({'work': str(work), 'pid': process.pid}), flush=True)
         try:
-            code = process.wait(timeout=600 if args.vita_next else 240)
+            code = process.wait(timeout=240)
         except BaseException:
             if os.name == 'nt':
                 subprocess.run(['taskkill','/PID',str(process.pid),'/T','/F'], capture_output=True)
@@ -149,8 +150,7 @@ def main():
     else:
         result=json.loads((work/'result.json').read_text(encoding='utf-8'))
         (work/'acceptance.json').write_text(json.dumps({
-            'passed':True,'kind':'maiweave' if args.maiweave else 'life-provider' if args.life_provider else 'maiwork' if args.maiwork else 'vita-next' if args.vita_next else 'community' if args.community else 'sleep' if args.sleep else 'behavior',
-            'life_config':'generic' if args.generic_life_config else 'legacy',
+            'passed':True,'kind':'maiweave' if args.maiweave else 'life-provider' if args.life_provider else 'maiwork' if args.maiwork else 'community' if args.community else 'sleep' if args.sleep else 'behavior',
             'baseline':pins,'cases':result['cases'],
             'maiweave':weave_pin,
             'sources_sha256':hashlib.sha256((work/'sources.json').read_bytes()).hexdigest(),

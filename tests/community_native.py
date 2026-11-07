@@ -9,7 +9,7 @@ import json
 import time
 from types import SimpleNamespace
 
-from native_scenario import CATEYE,POKE,VITA,HUSH
+from native_scenario import CATEYE,POKE,LIFE,HUSH
 
 
 async def run_cases(values):
@@ -121,8 +121,8 @@ async def run_cases(values):
         for hook in ('maisaka.planner.before_request','maisaka.replyer.before_request'):
             result=await c.manager.invoke_hook(hook,session_id=c.stream,extra_prompt='')
             assert not result.aborted
-            assert '睡眠' in result.kwargs['extra_prompt']
-        c.cases.append('sleep_keeps_cognition_hook_available_with_life_context')
+            assert not result.errors
+        c.cases.append('sleep_does_not_disable_unrelated_hooks')
         before=len(c.writes);notices=len(received)
         await c.peers[-1].send_json({'time':int(time.time())+100,'self_id':123456789,'post_type':'notice',
             'notice_type':'group_msg_emoji_like','sub_type':'add','group_id':987654321,'user_id':10003,
@@ -133,7 +133,7 @@ async def run_cases(values):
         before=len(c.writes)
         await c.tool('emoji_like_list',{})
         mark('sleep_readonly_emoji_list_remains_available',before,0)
-        assert (await c.command('/maivita wake'))[0]
+        assert await c.awake()
         before=len(c.writes);await incoming()
         mark('wake_new_message_reacts_without_backlog',before,1)
         await incoming(text='麦麦先安静一会',await_entry=False)
@@ -145,14 +145,9 @@ async def run_cases(values):
         assert (await c.command('/maihush mute 5m'))[0]
         await blocked_state('hard_mute_blocks_cateye_all_outgoing_paths')
         assert (await c.command('/maihush unmute'))[0]
-        # Busy uses Vita's real configured body threshold, not a fake policy answer.
-        cfg=deepcopy(c.configs['maibot-maivita-plugin']);cfg['availability']={'enabled':True,'busy_energy_threshold':100}
-        import tomli_w
-        path=c.work/'plugins/maibot-maivita-plugin/config.toml';path.write_text(tomli_w.dumps(cfg),encoding='utf-8')
-        assert await c.supervisor.reload_plugins([VITA],reason='community-busy-test')
+        await c.life_state('busy')
         await blocked_state('busy_blocks_cateye_all_outgoing_paths')
-        path.write_text(tomli_w.dumps(c.configs['maibot-maivita-plugin']),encoding='utf-8')
-        assert await c.supervisor.reload_plugins([VITA],reason='community-busy-end')
+        await c.awake()
         before=len(c.writes)
         audit_before=len(policy.audit)
         entered=asyncio.Event();release=asyncio.Event()
@@ -165,10 +160,10 @@ async def run_cases(values):
         await pending
         assert any(e['reason']=='life:sleeping' for e in list(policy.audit)[audit_before:])
         mark('cateye_prepared_while_awake_but_sleep_before_submission',before,0)
-        assert (await c.command('/maivita wake'))[0]
-        assert (await c.supervisor.unload_plugins([VITA],reason='community-provider-loss')).success
-        await blocked_state('missing_vita_blocks_cateye_all_outgoing_paths')
-        assert await c.supervisor.reload_plugins([VITA],reason='community-provider-restored')
+        assert await c.awake()
+        assert (await c.supervisor.unload_plugins([LIFE],reason='community-provider-loss')).success
+        await blocked_state('missing_life_blocks_cateye_all_outgoing_paths')
+        assert await c.supervisor.reload_plugins([LIFE],reason='community-provider-restored')
         before=len(c.writes);await incoming()
         mark('provider_restore_new_request_success_no_replay',before,1)
     finally:

@@ -13,6 +13,24 @@ from src.plugin_runtime.behavior_policy.runtime import ADAPTER, BehaviorPolicy
 ROUTE = dict(platform='qq', account_id='123456789', scope=None, chat_type='group', target_id='987654321')
 
 
+def test_each_bot_reads_its_own_policy_file(tmp_path, monkeypatch):
+    import json
+    monkeypatch.delenv('MAIBOT_BEHAVIOR_CONFIG', raising=False)
+    policies = []
+    for account in ('11111', '22222'):
+        root = tmp_path / account
+        (root / 'config').mkdir(parents=True)
+        (root / 'config/behavior_control.json').write_text(json.dumps({'enabled': True,
+            'targets': [{**ROUTE, 'account_id': account, 'providers': ['life', 'hush']}]}), encoding='utf-8')
+        monkeypatch.setenv('MAIBOT_INSTANCE_DIR', str(root))
+        policies.append(BehaviorPolicy())
+    assert [p.targets[0]['account_id'] for p in policies] == ['11111', '22222']
+    assert policies[0].actions is not policies[1].actions
+    (root / 'config/behavior_control.json').write_text('{broken', encoding='utf-8')
+    with pytest.raises(ValueError):
+        BehaviorPolicy()
+
+
 def policy():
     p = BehaviorPolicy({'enabled': True, 'targets': [{**ROUTE, 'providers': ['vita', 'hush'],
                                                      'autonomous_plugins': [ADAPTER]}]})

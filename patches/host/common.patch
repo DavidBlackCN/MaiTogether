@@ -1,6 +1,8 @@
+diff --git a/src/plugin_runtime/capabilities/registry.py b/src/plugin_runtime/capabilities/registry.py
+index 219c64f3b..b48ad21ad 100644
 --- a/src/plugin_runtime/capabilities/registry.py
 +++ b/src/plugin_runtime/capabilities/registry.py
-@@ -17,6 +17,12 @@
+@@ -17,6 +17,12 @@ logger = get_logger("plugin_runtime.integration")
  def register_capability_impls(manager: "PluginRuntimeManager", supervisor: "PluginSupervisor") -> None:
      """向指定 Supervisor 注册主程序提供的能力实现。"""
      cap_service = supervisor.capability_service
@@ -13,9 +15,11 @@
      cap_service.register_capability("webui.claim_upload", claim_upload)
      cap_service.register_capability("internal_chat.identity", internal_chat.identity)
      cap_service.register_capability("internal_chat.send", internal_chat.send)
+diff --git a/src/plugin_runtime/host/capability_service.py b/src/plugin_runtime/host/capability_service.py
+index 0ff31fe17..c660abc88 100644
 --- a/src/plugin_runtime/host/capability_service.py
 +++ b/src/plugin_runtime/host/capability_service.py
-@@ -77,7 +77,9 @@
+@@ -77,7 +77,9 @@ class CapabilityService:
  
          # 3. 执行
          try:
@@ -26,9 +30,11 @@
              resp_payload = CapabilityResponsePayload(success=True, result=result)
              return envelope.make_response(payload=resp_payload.model_dump())
          except RPCError as e:
+diff --git a/src/plugin_runtime/host/rpc_server.py b/src/plugin_runtime/host/rpc_server.py
+index c4f2457d2..50e47163f 100644
 --- a/src/plugin_runtime/host/rpc_server.py
 +++ b/src/plugin_runtime/host/rpc_server.py
-@@ -184,6 +184,8 @@
+@@ -184,6 +184,8 @@ class RPCServer:
          plugin_id: str = "",
          payload: Optional[Dict[str, Any]] = None,
          timeout_ms: int = 30000,
@@ -37,7 +43,7 @@
      ) -> Envelope:
          """向 Runner 发送 RPC 请求并等待响应
  
-@@ -208,6 +210,8 @@
+@@ -208,6 +210,8 @@ class RPCServer:
              method=method,
              plugin_id=plugin_id,
              timeout_ms=timeout_ms,
@@ -46,9 +52,11 @@
              payload=payload or {},
          )
  
+diff --git a/src/plugin_runtime/host/supervisor.py b/src/plugin_runtime/host/supervisor.py
+index afedef4b6..3942f8297 100644
 --- a/src/plugin_runtime/host/supervisor.py
 +++ b/src/plugin_runtime/host/supervisor.py
-@@ -660,6 +660,7 @@
+@@ -699,6 +699,7 @@ class PluginRunnerSupervisor:
          component_name: str,
          args: Optional[Dict[str, Any]] = None,
          timeout_ms: int = 30000,
@@ -56,7 +64,7 @@
      ) -> Envelope:
          """调用 Runner 内的插件组件。
  
-@@ -674,12 +675,13 @@
+@@ -713,12 +714,13 @@ class PluginRunnerSupervisor:
              Envelope: RPC 响应信封。
          """
          self._ensure_accepting_runner_rpc()
@@ -76,21 +84,25 @@
  
      async def invoke_message_gateway(
          self,
+diff --git a/src/plugin_runtime/protocol/envelope.py b/src/plugin_runtime/protocol/envelope.py
+index ae0ff7768..c87f86cac 100644
 --- a/src/plugin_runtime/protocol/envelope.py
 +++ b/src/plugin_runtime/protocol/envelope.py
-@@ -72,6 +72,9 @@
-     序列化流程：Envelope -> .model_dump() -> MsgPack encode
+@@ -73,6 +73,9 @@ class Envelope(BaseModel):
      反序列化流程：MsgPack decode -> Envelope.model_validate(data)
      """
-+
+ 
 +    context_ref: str = ""
 +    behavior_control: Dict[str, Any] = Field(default_factory=dict)
- 
++
      protocol_version: str = Field(default=PROTOCOL_VERSION, description="协议版本")
      """协议版本"""
+     request_id: int = Field(description="单调递增请求 ID")
+diff --git a/src/plugin_runtime/runner/rpc_client.py b/src/plugin_runtime/runner/rpc_client.py
+index d99c0c9dd..4732d51dc 100644
 --- a/src/plugin_runtime/runner/rpc_client.py
 +++ b/src/plugin_runtime/runner/rpc_client.py
-@@ -174,6 +174,8 @@
+@@ -174,6 +174,8 @@ class RPCClient:
          plugin_id: str = "",
          payload: Optional[Dict[str, Any]] = None,
          timeout_ms: int = 30000,
@@ -99,7 +111,7 @@
      ) -> Envelope:
          """向 Host 发送 RPC 请求并等待响应。
  
-@@ -197,6 +199,8 @@
+@@ -197,6 +199,8 @@ class RPCClient:
              method=method,
              plugin_id=plugin_id,
              timeout_ms=timeout_ms,
@@ -108,7 +120,7 @@
              payload=payload or {},
          )
  
-@@ -305,7 +309,9 @@
+@@ -308,7 +312,9 @@ class RPCClient:
              return
  
          try:
@@ -119,9 +131,11 @@
              await connection.send_frame(self._codec.encode_envelope(response))
          except RPCError as exc:
              error_resp = envelope.make_error_response(exc.code.value, exc.message, exc.details)
+diff --git a/src/plugin_runtime/runner/runner_main.py b/src/plugin_runtime/runner/runner_main.py
+index 28a73ee4c..bca75e5fa 100644
 --- a/src/plugin_runtime/runner/runner_main.py
 +++ b/src/plugin_runtime/runner/runner_main.py
-@@ -836,7 +836,9 @@
+@@ -941,7 +941,9 @@ class PluginRunner:
                  if request_timeout_ms <= 0:
                      raise ValueError(f"RPC timeout_ms 必须大于 0: {timeout_ms}")
  
@@ -131,7 +145,7 @@
                  method=normalized_method,
                  plugin_id=bound_plugin_id,
                  payload=request_payload,
-@@ -855,6 +857,8 @@
+@@ -960,6 +962,8 @@ class PluginRunner:
              rpc_call=_rpc_call,
              plugin_paths=plugin_paths,
          )

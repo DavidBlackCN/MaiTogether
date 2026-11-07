@@ -10,10 +10,9 @@ import uuid
 from aiohttp import web
 import tomli_w
 
-VITA='davidblackcn.maibot-maivita-plugin'
+LIFE='test.life-provider'
 HUSH='davidblackcn.maibot-maihush-plugin'
 IDENTITY='davidblackcn.maibot-maiidentity-plugin'
-COORD='davidblackcn.maibot-maicoordinate-plugin'
 ADAPTER='maibot-team.snowluma-adapter'
 POKE='TAIY2020.smart_poke_plugin'
 CATEYE='github.cateye.set-msg-emoji-like'
@@ -71,15 +70,15 @@ async def run(work):
     server=web.AppRunner(app); await server.setup()
     site=web.TCPSite(server,'127.0.0.1',0); await site.start()
     port=site._server.sockets[0].getsockname()[1]
+    from src.common.runtime_context import RuntimeContext, RUNTIME_CONTEXT_ENV
+    os.environ[RUNTIME_CONTEXT_ENV] = RuntimeContext(
+        bot_id=uuid.uuid4().hex, http_endpoint='isolated-test',
+        public_base_url=f'http://127.0.0.1:{port}', status_path=work/'worker-status.json').to_env()
     configs={
       'maibot-maihush-plugin':{'plugin':{'enabled':True,'config_version':'2'},'groups':[{'group_id':'987654321','bot_account_id':'123456789'}],
          'management':{'source':'identity'},'reply':{'enabled':True},'social':{'enabled':True,'task_name':'test'}},
       'maibot-maiIdentity-plugin':{'plugin':{'enabled':True,'config_version':'4'},'management':{'admin_accounts':['10001']},
          'identity':{'people':[{'qq':'10003','nickname':'妈妈'}]}},
-      'maibot-maivita-plugin':{'plugin':{'enabled':True,'config_version':'5'},
-         'instance':{'writer_lock':str(work/'vita.lock'),'allowed_streams':[stream]},'model':{'generate_on_start':False}},
-      'maibot-maicoordinate-plugin':{'plugin':{'enabled':True,'config_version':'2'},'mode':'shadow',
-         'acknowledgement':'isolated-test-instance','model_task':'test','poll_seconds':2},
       'adapter':{'plugin':{'enabled':True,'config_version':'2.7.1'},'client':{'server':'127.0.0.1','port':port,
          'client_type':'snowluma','heartbeat_interval':0,'action_timeout_sec':2},
          'chat_abilities':{'enable_poke_tool':True,'enable_emoji_like_tool':True}},
@@ -94,8 +93,6 @@ async def run(work):
         from maiwork_native import configure
         configure(work, configs, port)
     if weave:
-        configs.pop('maibot-maivita-plugin')
-        configs.pop('maibot-maicoordinate-plugin')
         configs['maiweave'] = {'plugin': {'enabled': True, 'config_version': '0.9.0'},
             'life': {'enabled': True, 'autonomous': False, 'model_task': 'test'},
             'world': {'weather_enabled': False, 'news_enabled': False, 'search_enabled': False, 'places_enabled': False},
@@ -103,12 +100,9 @@ async def run(work):
         if 'maiwork' in configs: configs['maiwork']['together']['life_provider'] = 'maiweave'
     for folder,config in configs.items():
         (work/'plugins'/folder/'config.toml').write_text(tomli_w.dumps(config),encoding='utf-8')
-    if os.environ.get('MAIVITA_NEXT_TEST')=='1':
-        from vita_next_native import configure
-        configure(work,configs,stream)
-    (work/'behavior.json').write_text(json.dumps({'enabled':True,'targets':[{
+    (work/'behavior.json').write_text(json.dumps({'enabled':True, 'life_provider':{'plugin_id':LIFE,'api':'evaluate_behavior','version':'1'},'targets':[{
         'platform':'qq','account_id':'123456789','scope':None,'chat_type':'group','target_id':'987654321',
-        'providers':['life' if os.environ.get('MAIBOT_GENERIC_LIFE_CONFIG')=='1' else 'vita','hush'],'autonomous_plugins':[PROBE,POKE,CATEYE,ADAPTER,COORD,HUSH]+(['chartyr.maiwork'] if os.environ.get('MAIWORK_TEST')=='1' else [])}]}),encoding='utf-8')
+        'providers':['life','hush'],'autonomous_plugins':[PROBE,POKE,CATEYE,ADAPTER,HUSH]+(['chartyr.maiwork'] if os.environ.get('MAIWORK_TEST')=='1' else [])}]}),encoding='utf-8')
     if weave:
         behavior=json.loads((work/'behavior.json').read_text())
         behavior['targets'][0]['providers']=['life','hush']
@@ -127,9 +121,6 @@ async def run(work):
     async def models(plugin_id,capability,args): return ['test']
     generating=asyncio.Event(); generated=asyncio.Event()
     async def model(plugin_id,capability,args):
-        if plugin_id==VITA and os.environ.get('MAIVITA_NEXT_TEST')=='1':
-            from vita_next_native import model_response
-            return await model_response(args,work)
         if plugin_id==PROBE:
             generating.set(); await generated.wait()
             return {'success':True,'response':'test','model_name':'local-fake'}
@@ -176,20 +167,10 @@ async def run(work):
     async def tool(name,args):
         return await component_query_service.invoke_tool_as_tool(ToolInvocation(name,arguments=args),
             ToolExecutionContext(session_id=stream,stream_id=stream,group_id='987654321',user_id='10001',platform='qq',is_group_chat=True))
-    async def sleeping():
-        assert (await supervisor.unload_plugins([VITA],reason='sleep-fixture')).success
-        import sys
-        sys.path.insert(0,str(work/'plugins/maibot-maivita-plugin'))
-        from maivita.life.storage.life_database import LifeDatabase
-        from maivita.life.life_state.engine import LifeStateEngine
-        from maivita.life.domain.clock import SystemClock
-        from maivita.life.domain.commands import Command
-        db=LifeDatabase(work/'data/plugins'/VITA/'life/maivita.db',clock=SystemClock())
-        life=LifeStateEngine(db)
-        # Observed sleep fixture exercises the same session state without waiting five real minutes after wake.
-        life.execute(Command(kind='start_sleep',payload={'duration_minutes':5},source='legacy_observed',
-            idempotency_key=uuid.uuid4().hex,expected_state_version=life.state().state_version))
-        assert await supervisor.reload_plugins([VITA],reason='sleep-fixture-ready')
+    async def life_state(state):
+        return await call(LIFE,'set_state',{'state':state})
+    async def sleeping(): return await life_state('sleeping')
+    async def awake(): return await life_state('awake')
     cases=[]
     try:
         await supervisor.start()
@@ -197,25 +178,16 @@ async def run(work):
             from weave_native import run_cases
             await run_cases(locals())
             return
-        assert {VITA,HUSH,IDENTITY,COORD,ADAPTER,POKE,CATEYE,PROBE} <= set(supervisor._registered_plugins),supervisor._registered_plugins
-        for plugin in (VITA,HUSH,IDENTITY,COORD,ADAPTER,POKE,CATEYE):
+        assert {LIFE,HUSH,IDENTITY,ADAPTER,POKE,CATEYE,PROBE} <= set(supervisor._registered_plugins),supervisor._registered_plugins
+        for plugin in (LIFE,HUSH,IDENTITY,ADAPTER,POKE,CATEYE):
             inspected=await supervisor.inspect_plugin_config(plugin)
             assert not inspected.config_error,(plugin,inspected.config_error)
         async def ready():
             drivers=get_platform_io_manager().resolve_drivers(RouteKey('qq','123456789',None))
-            life=await call(VITA,'get_life_state')
-            return bool(drivers) and life.get('ok')
+            return bool(drivers)
         await wait(ready)
         if os.environ.get('MAIBOT_LIFE_TEST')=='1':
             from life_native import run_cases
-            await run_cases(locals())
-            return
-        if os.environ.get('MAIWORK_TEST')=='1':
-            from maiwork_native import run_cases
-            await run_cases(locals())
-            return
-        if os.environ.get('MAIVITA_NEXT_TEST')=='1':
-            from vita_next_native import run_cases
             await run_cases(locals())
             return
         if os.environ.get('MAIBOT_SLEEP_TEST')=='1':
@@ -226,19 +198,10 @@ async def run(work):
             from community_native import run_cases
             await run_cases(locals())
             return
-        for folder,plugin in [('maibot-maiIdentity-plugin',IDENTITY),('maibot-maihush-plugin',HUSH),
-                              ('maibot-maivita-plugin',VITA),('maibot-maicoordinate-plugin',COORD)]:
-            acknowledged=await supervisor.notify_plugin_config_updated(plugin,config_data=configs[folder],
+        for folder,plugin in [('maibot-maiIdentity-plugin',IDENTITY),('maibot-maihush-plugin',HUSH)]:
+            assert await supervisor.notify_plugin_config_updated(plugin,config_data=configs[folder],
                 config_version=configs[folder]['plugin']['config_version'])
-            if plugin in (VITA,COORD):
-                # These plugins deliberately require reload after a configuration change.
-                assert not acknowledged
-                if plugin==VITA:
-                    before=len(writes)
-                    assert not (await probe('api'))['success'] and len(writes)==before
-                assert await supervisor.reload_plugins([plugin],reason='config-update-required-reload')
-            else: assert acknowledged
-        cases.append('config_update_reload_and_unavailable_provider_blocking')
+        cases.append('active_core_config_update')
         before=len(writes)
         assert await probe(), 'normal text rejected: '+str(list(get_policy().audit))
         assert len(writes)==before+1,writes
@@ -331,7 +294,7 @@ async def run(work):
         assert len(writes)==before
         assert (await command('/maihush unmute'))[0]
         cases.append('mixed_batch_forward_mute_no_writes')
-        for provider in (VITA,HUSH,IDENTITY):
+        for provider in (LIFE,HUSH,IDENTITY):
             assert not (await call(PROBE,'probe',{'mode':'private','provider':provider}))['success']
         r=await supervisor.invoke_api(PROBE,'probe',{'mode':'forged'})
         assert not r.payload.get('success')
@@ -352,31 +315,26 @@ async def run(work):
         assert not (await probe('api'))['success']
         await tool('emoji_like',{'stream_id':stream,'target_message_id':'-999','emoji':'128512'})
         assert len(writes)==before
-        assert (await command('/maivita wake'))[0]
+        assert await awake()
         assert await probe()
         cases.append('sleep_all_paths_blocked_trusted_wake_restores')
         pending=asyncio.create_task(probe('generate')); await asyncio.wait_for(generating.wait(),3)
         await sleeping(); before=len(writes); generated.set()
         assert not await pending and len(writes)==before
-        assert (await command('/maivita wake'))[0]
+        assert await awake()
         cases.append('sleep_during_generation_blocks_submission')
-        vita_config=configs['maibot-maivita-plugin']
-        vita_config['availability']={'enabled':True,'busy_energy_threshold':100}
-        (work/'plugins/maibot-maivita-plugin/config.toml').write_text(tomli_w.dumps(vita_config),encoding='utf-8')
-        assert await supervisor.reload_plugins([VITA],reason='busy-fixture')
+        await life_state('busy')
         before=len(writes)
         assert not (await probe('api'))['success'] and len(writes)==before
         assert get_policy().audit[-1]['reason']=='life:busy'
-        vita_config.pop('availability')
-        (work/'plugins/maibot-maivita-plugin/config.toml').write_text(tomli_w.dumps(vita_config),encoding='utf-8')
-        assert await supervisor.reload_plugins([VITA],reason='busy-fixture-end')
-        cases.append('busy_boundary_uses_real_vita_policy')
-        assert (await supervisor.unload_plugins([VITA],reason='provider-loss')).success
+        await awake()
+        cases.append('busy_life_contract_blocks_social')
+        assert (await supervisor.unload_plugins([LIFE],reason='provider-loss')).success
         before=len(writes)
         assert not (await probe('api'))['success']
         assert (await probe('api','get_msg',{'message_id':-999}))['success']
         assert len(writes)==before
-        assert await supervisor.reload_plugins([VITA],reason='provider-restored')
+        assert await supervisor.reload_plugins([LIFE],reason='provider-restored')
         cases.append('required_provider_unloaded_denies_only_writes')
         # A scheduling barrier around the real provider holds the adapter's send lock.
         # The second action must check the newly committed mute after it gets that lock.

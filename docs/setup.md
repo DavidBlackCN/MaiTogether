@@ -1,6 +1,6 @@
 # 安装与配置
 
-当前配套版本为 MaiBot **1.3.19**、Plugin SDK **2.21.0**、QQ 连接器 **1.1.13**。请使用本项目构建的主程序和连接器，不能只安装其中一个。
+当前配套版本为 MaiBot **1.4.1**、Plugin SDK **2.21.0**、QQ 连接器 **1.1.13**。默认完整组合请使用本项目构建的主程序和连接器，不能只安装其中一个。
 
 ## 安装顺序
 
@@ -16,7 +16,9 @@
 
 将 [behavior_control.example.json](../behavior_control.example.json) 复制为实例的 `config/behavior_control.json`，替换示例账号和群号。文件必须是合法 JSON，不能添加注释。
 
-也可以用环境变量 `MAIBOT_BEHAVIOR_CONFIG` 指定文件路径。修改后需要重启 Host。
+1.4.x 中每个 Bot 有自己的实例目录，配置放在对应实例下，不放在共用主程序目录。修改后重启对应 Bot。
+
+也可以用环境变量 `MAIBOT_BEHAVIOR_CONFIG` 指定文件路径。该变量会被子进程继承，多实例通常应使用各自的默认路径，避免所有 Bot 误读同一份配置。
 
 | 字段 | 填写方法 |
 | --- | --- |

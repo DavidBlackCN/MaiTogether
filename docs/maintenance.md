@@ -2,7 +2,7 @@
 
 MaiTogether 跟进 MaiBot 官方正式稳定版。`baseline.json` 记录当前已验证的版本，不能只改版本号就给新版安装旧补丁。安装和配置见 [README](../README.md) 与[配置说明](setup.md)。
 
-MaiBot 1.4.1 的升级检查发现：行为补丁在 `component_query.py` 冲突，睡眠补丁在回复生成、回复工具、聊天循环、群运行状态和运行入口共五个文件冲突。多实例宿主也改变了启动与 WebUI 入口。完成这些适配和原生回归前，保持 1.3.19 构建基线，不跳过冲突或校验强行安装。
+当前基线为 MaiBot 1.4.1、SDK 2.21.0、QQ 连接器 1.1.13，修改版本 0.4.0。官方文件修改范围仍为 Host 20 个、连接器 5 个。行为配置从各 Bot 的实例目录读取。
 
 ## 文件位置
 
@@ -22,7 +22,7 @@ MaiBot 1.4.1 的升级检查发现：行为补丁在 `component_query.py` 冲突
 
 ## 从源码构建
 
-构建工具需要 Python 3.11 或以上版本、Git，以及包含固定提交的官方 Host、QQ 连接器 Git 仓库。运行和联调 Host 1.3.19 需要 Python 3.12 或以上版本，本项目在 Python 3.13 环境验收。在本项目目录执行，路径按实际位置替换：
+构建工具需要 Python 3.11 或以上版本、Git，以及包含固定提交的官方 Host、QQ 连接器 Git 仓库。运行和联调 Host 1.4.1 需要 Python 3.12 或以上版本，本项目在 Python 3.13 环境验收。在本项目目录执行，路径按实际位置替换：
 
 ```bash
 python tools/build.py --host-source ../upstream/MaiBot --adapter-source ../upstream/MaiBot-SnowLuma-Adapter --output ../control-build
@@ -40,7 +40,7 @@ python tools/build.py --host-source ../upstream/MaiBot --adapter-source ../upstr
 
 ```bash
 python tools/upgrade.py check --host-source ../upstream/MaiBot --sdk-source ../upstream/maibot-plugin-sdk --adapter-source ../upstream/MaiBot-SnowLuma-Adapter --output ../upgrade-candidate
-python tools/validate.py --candidate ../upgrade-candidate --workspace .. --maiweave ../upstream/MaiWeave --maiwork ../MaiWork-adapted
+python tools/validate.py --candidate ../upgrade-candidate --workspace ..
 python tools/upgrade.py promote --candidate ../upgrade-candidate
 ```
 
@@ -52,14 +52,16 @@ python tools/upgrade.py promote --candidate ../upgrade-candidate
 
 ## 隔离回归的准备
 
-MaiWeave 联调需要 Super MaiMai 工作区中同级的 Hush、Identity 源码，以及 `.implementation/vendor/smart_poke_plugin`、`.implementation/vendor/Cateye-audit` 中的社区源码。另行准备已审查的 MaiWeave 源码和已构建的 MaiWork 适配目录。Python 环境需安装 Host、SDK 及参测插件依赖；SDK 必须与候选版本一致。
+需要 Super MaiMai 工作区中同级的 Hush、Identity 源码，以及 `.implementation/vendor/smart_poke_plugin`、`.implementation/vendor/Cateye-audit` 中的社区源码。Python 环境需安装 Host、SDK 及参测插件依赖；SDK 必须与候选版本一致。
 
-`validate.py` 会测试完整构建及两个独立构建，实际加载 Host、Runner、SDK 和原版社区插件；传入 `--maiweave`、`--maiwork` 后加入对应联调。完整矩阵还保留 Vita 兼容回归，因此需同级的 Vita、Coordinate 源码。QQ、模型使用本地替身，测试进程禁止外网连接。结果和日志保存在候选目录。
+`validate.py` 会测试完整构建及两个独立构建，实际加载 Host、Runner、SDK、Identity、Hush 和原版社区插件。生活状态由独立测试插件提供，覆盖睡眠、忙碌、故障和恢复，不依赖具体生活引擎。QQ、模型使用本地替身，测试进程禁止外网连接。结果和日志保存在候选目录。
+
+MaiWeave、MaiWork 是额外组合验收：准备已审查的 MaiWeave 源码和已构建的 MaiWork 适配目录，再传入 `--maiweave` 与 `--maiwork`。必须先检查它们的接口及基线；Host 回归通过不代表这两个插件已通过新版组合验收。
 
 单独定位问题时可运行：
 
 ```bash
-python tools/run_native.py --workspace .. --host ../control-build/host --adapter ../control-build/adapter --maiweave ../upstream/MaiWeave --maiwork ../MaiWork-adapted
+python tools/run_native.py --workspace .. --host ../control-build/host --adapter ../control-build/adapter
 ```
 
 当前原生验收在 Windows 上执行。真实 QQ、SnowLuma、Linux 服务器和长期运行仍需另测；替身不验证真实模型的工具选择和生成质量。
@@ -68,14 +70,14 @@ python tools/run_native.py --workspace .. --host ../control-build/host --adapter
 
 ## Life Provider 验证
 
-`tools/validate.py` 包含旧 Vita 配置、新 `life` 配置，以及完整／仅行为／仅睡眠构建的 Provider 测试。单独运行：
+`tools/validate.py` 包含完整／仅行为／仅睡眠构建的 Provider 测试。单独运行：
 
 ```bash
 python tools/run_native.py --life-provider --workspace .. --host ../control-build/host --adapter ../control-build/adapter
-python tools/run_native.py --generic-life-config --sleep --workspace .. --host ../control-build/host --adapter ../control-build/adapter
+python tools/run_native.py --sleep --workspace .. --host ../control-build/host --adapter ../control-build/adapter
 ```
 
-独立测试 Provider 只存在于验收插件中：测试会卸载 Vita，验证其他插件 ID 和处理函数可工作，再检查超时、错误版本、非私有接口、卸载和恢复。它不代表 MaiWeave 实现。测试实例及结果使用独立输出目录，不覆盖运行实例。
+独立测试 Provider 只存在于验收插件中：测试切换插件 ID 和处理函数，再检查超时、错误版本、非私有接口、卸载和恢复。它不代表 MaiWeave 实现。旧 Provider 配置的解析兼容由单元测试保留。测试实例及结果使用独立输出目录，不覆盖运行实例。
 
 ## 修改补丁与打包
 
@@ -91,7 +93,7 @@ python tools/export_patches.py --host-source ../upstream/MaiBot --adapter-source
 python tools/package.py --workspace .. --output ../MaiTogether-package --maiweave-source ../upstream/MaiWeave --maiwork-source ../upstream/MaiWork
 ```
 
-要求核心插件仓库干净、MaiWeave 提交与审查记录一致。包内包含完整源码、版本和文件哈希，不包含运行配置与数据库。工具不传 `--maiweave-source` 时保留 Vita／Coordinate 兼容组合的打包方式。
+要求核心插件仓库干净、MaiWeave 提交与审查记录一致。包内包含完整源码、版本和文件哈希，不包含运行配置与数据库。不传 `--maiweave-source` 时仅包含 Identity、Hush 和主程序／连接器，生活引擎另行安装；MaiWork 的已验证 Host 版本须与当前基线一致。
 
 ## 备份和恢复
 

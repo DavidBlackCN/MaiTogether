@@ -27,19 +27,22 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--workspace',type=Path,required=True)
     p.add_argument('--output',type=Path,required=True)
     p.add_argument('--maiwork-source',type=Path,help='Include the pinned MaiWork adaptation')
-    p.add_argument('--maiweave-source',type=Path,help='Experimental no-Vita bundle; excludes Coordinate and MaiTrace')
+    p.add_argument('--maiweave-source',type=Path,help='Include the reviewed MaiWeave source')
     a=p.parse_args()
     root=a.workspace.resolve();out=a.output.resolve()
+    baseline=json.loads((CONTROL/'baseline.json').read_text(encoding='utf-8'))
+    if a.maiwork_source:
+        work_pin=json.loads((CONTROL/'integrations/maiwork/baseline.json').read_text(encoding='utf-8'))
+        if work_pin['host'] != baseline['host']['tag'].removeprefix('v'):
+            raise ValueError('MaiWork adaptation has not been validated on this Host baseline')
     archive=out.with_name(out.name+'.zip')
     if out.exists() or archive.exists():raise ValueError('Delivery output must not exist')
     out.mkdir(parents=True)
-    baseline=json.loads((CONTROL/'baseline.json').read_text(encoding='utf-8'))
     for kind,prefix in [('host','Host'),('adapter','QQ-Adapter')]:
         folder=prefix+'-'+baseline[kind]['tag'].removeprefix('v')
         build(root/'.implementation/vendor'/folder,kind,out/kind)
     pins={}
     core=('maibot-maiIdentity-plugin','maibot-maihush-plugin')
-    if not a.maiweave_source: core+=('maibot-maivita-plugin',)
     for folder in core:
         source=root/folder
         if git(source,'status','--porcelain').strip(): raise RuntimeError('Uncommitted source: '+folder)
@@ -54,12 +57,6 @@ def main():
             raise ValueError('MaiWeave source differs from the reviewed clean commit')
         copy_files(source,out/'plugins/MaiWeave',tracked_files(source))
         pins['MaiWeave']=pin
-    else:
-        source=root/'maibot-maivita-plugin/ecosystem/coordinator'
-        names=[f.relative_to(source).as_posix() for f in source.rglob('*') if f.is_file()]
-        copy_files(source,out/'plugins/maibot-maicoordinate-plugin',names)
-        pins['maibot-maicoordinate-plugin']={'version':json.loads((source/'_manifest.json').read_text(encoding='utf-8'))['version'],
-                                           'included_in':pins['maibot-maivita-plugin']['commit']}
     if a.maiwork_source:
         spec=importlib.util.spec_from_file_location('maiwork_build',CONTROL/'integrations/maiwork/build.py')
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
@@ -69,8 +66,8 @@ def main():
     (out/'core-versions.json').write_text(json.dumps(pins,indent=2)+'\n',encoding='utf-8')
     version=json.loads((CONTROL/'baseline.json').read_text(encoding='utf-8'))['adaptation_version']
     (out/'README.md').write_text(f'# MaiTogether {version}\n\n'
-        + ('**MaiWeave 实验组合：尚有睡眠状态缺口，不用于直接替换生产 Vita。** 详情见 [接入说明](maintenance/docs/maiweave.md)。本包不含 Vita、Coordinate 或 MaiTrace。\n\n' if a.maiweave_source else '') +
-        f'`host/` 为组装后的 Host {baseline["host"]["tag"]}；将 `plugins/` 中的插件及 `adapter/` 连接器安装到 Host 的插件目录，同一插件仅保留一份。\n\n'
+        + ('包含的 MaiWeave 接口范围见 [接入说明](maintenance/docs/maiweave.md)。\n\n' if a.maiweave_source else '生活引擎请另行安装，并设置 Life Provider。\n\n') +
+        f'`host/` 为组装后的 Host {baseline["host"]["tag"]}；将 `plugins/` 中的插件及 `adapter/` 连接器安装到所选 Bot 实例的插件目录，同一插件仅保留一份。\n\n'
         f'依赖、配置、测试和回滚说明见 [维护说明](maintenance/README.md)。SDK 固定为 {baseline["sdk"]["tag"]}，详见 maintenance/baseline.json。\n\n'
         '本包不含运行配置、账号、数据库、日志或虚拟环境。启用前填写完整目标与受管范围；真实 QQ、SnowLuma 和 Linux 服务器仍须验收。\n',encoding='utf-8')
     manifest=hashes(out)

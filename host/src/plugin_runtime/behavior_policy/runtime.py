@@ -40,7 +40,8 @@ def route_matches(expected, actual):
 class BehaviorPolicy:
     def __init__(self, config=None):
         if config is None:
-            base = Path(os.environ.get('MAIBOT_INSTANCE_DIR', Path(__file__).resolve().parents[3]))
+            from src.common.paths import get_instance_root
+            base = get_instance_root()
             path = Path(os.environ.get('MAIBOT_BEHAVIOR_CONFIG', base / 'config/behavior_control.json'))
             config = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {'enabled': False}
         if type(config.get('enabled', False)) is not bool:

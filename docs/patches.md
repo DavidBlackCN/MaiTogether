@@ -17,7 +17,7 @@
 | 共用 | `plugin_runtime/runner/runner_main.py` | 回传调用引用，向核心插件提供只读控制状态 |
 | 行为 | `platform_io/manager.py` | 标准消息发送检查与结果记录 |
 | 行为 | `plugin_runtime/capabilities/core.py` | 让调用方区分未提交、部分完成和结果未知 |
-| 行为 | `plugin_runtime/component_query.py` | 在 Tool、Action、Command 的真实入口记录来源 |
+| 行为 | `plugin_runtime/component_query.py` | 在 Tool、Command 的真实入口记录来源；旧 Action 兼容调用沿用官方 Tool 路径 |
 | 行为 | `plugin_runtime/host/hook_dispatcher.py` | Hook 熔断不能当作执行成功 |
 | 睡眠 | `chat/heart_flow/heartflow_message_processor.py` | 睡眠消息只入原始记录，不唤醒聊天 |
 | 睡眠 | `maisaka/runtime.py` | 其他消息入口也不能绕过暂停 |
@@ -47,7 +47,7 @@
 
 新增源码位于 `host/src/plugin_runtime/behavior_policy/`：`context.py` 管调用生命周期，`runtime.py` 管策略和结果，`actions.py` 管动作分类；`platform.py` 处理标准发送；`sleep_guard.py` 判断睡眠和过滤记录，`cognition_hooks.py` 适配官方聊天、回复和记忆入口。`build_features.py` 由构建选择功能。
 
-两个功能共用可信调用和策略访问，不各自实现一套身份系统。代码使用显式调用或装饰器，不在启动时替换官方方法。升级时重点复核本表中的入口及相应新增模块。
+两个功能共用可信调用和策略访问，不各自实现一套身份系统。代码使用显式调用或装饰器，不在启动时替换官方方法。1.4.1 的回复缓存、提示词构建后的请求和创意模式翻译均在启动前复查生活状态；Focus 队列使用官方的新接口清理暂停输入。升级时重点复核本表中的入口及相应新增模块。
 
 ## 保留的限制
 

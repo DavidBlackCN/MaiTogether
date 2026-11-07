@@ -1,11 +1,11 @@
-"""Real Host/Runner/Vita policy with isolated cognition and memory observers."""
+"""Real Host/Runner/Life Provider with isolated cognition and memory observers."""
 import asyncio
 import time
 from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from native_scenario import VITA
+from native_scenario import LIFE
 
 
 async def run_cases(values):
@@ -39,7 +39,8 @@ async def run_cases(values):
     registered = AsyncMock()
     memory = AsyncMock()
     with patch.object(heartflow_manager, 'get_or_create_heartflow_chat', AsyncMock(
-            return_value=SimpleNamespace(register_message=registered))), \
+            return_value=SimpleNamespace(register_message=registered,
+                chat_stream=SimpleNamespace(is_group_session=True)))), \
          patch.object(memory_automation_service, 'on_incoming_message', memory):
         assert not await guard.pause_reason(c.stream)
         awake, _ = await receive('awake positive control')
@@ -125,7 +126,7 @@ async def run_cases(values):
             [persisted], SimpleNamespace(person_id=''), set()) == []
         mark('persisted_sleep_message_excluded_from_context_and_fact_evidence')
 
-        assert (await c.command('/maivita wake'))[0]
+        assert await c.awake()
         assert not await guard.pause_reason(c.stream)
         await shared._check_life_state()
         assert not await guard.memory_allowed(persisted)
@@ -159,9 +160,14 @@ async def run_cases(values):
         else:
             raise AssertionError('late sleep not detected')
         before = len(c.writes)
-        assert not await c.probe()
-        assert len(c.writes) == before
-        mark('late_sleep_stops_new_request_and_preserves_final_send_check')
+        if get_policy().behavior_enabled:
+            assert not await c.probe()
+            assert len(c.writes) == before
+            mark('late_sleep_stops_new_request_and_preserves_final_send_check')
+        else:
+            assert await c.probe()
+            assert len(c.writes) == before + 1
+            mark('sleep_only_pauses_cognition_without_installing_send_control')
 
         # No model/context observer is called by any automatic memory path.
         for method, args in (
@@ -172,12 +178,12 @@ async def run_cases(values):
             await method(*args)
         mark('sleep_memory_workers_and_image_backfill_skip_record_only_message')
 
-        assert (await c.command('/maivita wake'))[0]
-        assert (await c.supervisor.unload_plugins([VITA], reason='sleep-test-missing')).success
+        assert await c.awake()
+        assert (await c.supervisor.unload_plugins([LIFE], reason='sleep-test-missing')).success
         assert await guard.pause_reason(c.stream) == 'life_state_unavailable'
-        await receive('missing Vita raw only')
+        await receive('missing Life Provider raw only')
         assert registered.await_count == 2
-        assert await c.supervisor.reload_plugins([VITA], reason='sleep-test-restore')
+        assert await c.supervisor.reload_plugins([LIFE], reason='sleep-test-restore')
         assert not await guard.pause_reason(c.stream)
         mark('missing_provider_stops_cognition_restored_provider_allows_new_work')
 
@@ -203,3 +209,5 @@ async def run_cases(values):
     guard.failed_reply(partial)
     assert partial.metadata['sent_message_ids'] == ['sent-id'] and draft not in str(partial)
     mark('partial_reply_preserves_delivery_ids_without_unsent_draft')
+    from reply_paths_native import run_cases as reply_paths
+    await reply_paths(c)

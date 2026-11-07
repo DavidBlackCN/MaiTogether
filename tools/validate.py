@@ -8,11 +8,10 @@ import sys
 
 from assembly import CONTROL, PROFILES, hashes, inputs_digest
 
-CORE_PLUGINS = ('maibot-maivita-plugin', 'maibot-maihush-plugin', 'maibot-maiIdentity-plugin')
+CORE_PLUGINS = ('maibot-maihush-plugin', 'maibot-maiIdentity-plugin')
 REQUIRED_CHECKS = {'unit', 'adapter', 'full-control', 'full-community', 'full-sleep',
                    'behavior-control', 'behavior-community', 'sleep-sleep',
-                   'full-life', 'behavior-life', 'sleep-life', 'full-generic-control',
-                   'full-generic-sleep', *CORE_PLUGINS}
+                   'full-life', 'behavior-life', 'sleep-life', *CORE_PLUGINS}
 
 
 def main():
@@ -22,6 +21,8 @@ def main():
     parser.add_argument('--maiweave', type=Path, help='Reviewed latest source for no-Vita acceptance on all build profiles')
     parser.add_argument('--maiwork', type=Path, help='Built adaptation; enables work unit and native tests')
     args = parser.parse_args()
+    if args.maiwork and not args.maiweave:
+        parser.error("--maiwork requires --maiweave")
     folder = args.candidate.resolve()
     evidence = folder / 'validation'
     evidence.mkdir(exist_ok=False)
@@ -51,8 +52,6 @@ def main():
         ('full', 'life', ['--life-provider']),
         ('behavior', 'life', ['--life-provider']),
         ('sleep', 'life', ['--life-provider']),
-        ('full', 'generic-control', ['--generic-life-config']),
-        ('full', 'generic-sleep', ['--generic-life-config', '--sleep']),
     ):
         commands.append((profile + '-' + mode, [sys.executable, str(CONTROL / 'tools/run_native.py'),
             '--workspace', str(args.workspace.resolve()), '--host', str(folder / profile / 'host'),
@@ -70,10 +69,6 @@ def main():
     if args.maiwork:
         commands.append(('maiwork-unit',[sys.executable,str(CONTROL/'integrations/maiwork/tests/run.py'),
             '--source',str(args.maiwork.resolve()),'--output',str(evidence/'maiwork-unit')]))
-        commands.append(('maiwork-vita',[sys.executable,str(CONTROL/'tools/run_native.py'),
-            '--workspace',str(args.workspace.resolve()),'--host',str(folder/'full/host'),
-            '--adapter',str(folder/'full/adapter'),'--maiwork',str(args.maiwork.resolve()),
-            '--output',str(evidence/'maiwork-vita')]))
     for name in CORE_PLUGINS:
         commands.append((name, [sys.executable, '-m', 'pytest', 'tests', '-q', '-p', 'no:cacheprovider',
                                 '--basetemp=' + str(evidence / (name + '-pytest')),
