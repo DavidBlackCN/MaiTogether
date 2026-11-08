@@ -66,10 +66,10 @@ def main():
     (out/'core-versions.json').write_text(json.dumps(pins,indent=2)+'\n',encoding='utf-8')
     version=json.loads((CONTROL/'baseline.json').read_text(encoding='utf-8'))['adaptation_version']
     (out/'README.md').write_text(f'# MaiTogether {version}\n\n'
-        + ('包含的 MaiWeave 接口范围见 [接入说明](maintenance/docs/maiweave.md)。\n\n' if a.maiweave_source else '生活引擎请另行安装，并设置 Life Provider。\n\n') +
+        + ('包内包含 MaiWeave，设置见 [插件说明](maintenance/docs/plugins/maiweave.md)。\n\n' if a.maiweave_source else 'MaiWeave 请按[插件说明](maintenance/docs/plugins/maiweave.md)另行安装。\n\n') +
         f'`host/` 为组装后的 Host {baseline["host"]["tag"]}；将 `plugins/` 中的插件及 `adapter/` 连接器安装到所选 Bot 实例的插件目录，同一插件仅保留一份。\n\n'
-        f'依赖、配置、测试和回滚说明见 [维护说明](maintenance/README.md)。SDK 固定为 {baseline["sdk"]["tag"]}，详见 maintenance/baseline.json。\n\n'
-        '本包不含运行配置、账号、数据库、日志或虚拟环境。启用前填写完整目标与受管范围；真实 QQ、SnowLuma 和 Linux 服务器仍须验收。\n',encoding='utf-8')
+        f'安装步骤和账号、群号设置见 [安装说明](maintenance/docs/setup.md)。SDK 使用 {baseline["sdk"]["tag"]}，详见 maintenance/baseline.json。\n\n'
+        '本包不含运行配置、账号、数据库或 Python 环境，请保留实例中的原有文件。\n',encoding='utf-8')
     manifest=hashes(out)
     (out/'SHA256SUMS.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
     with zipfile.ZipFile(archive,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=6) as z:

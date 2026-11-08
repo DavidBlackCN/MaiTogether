@@ -1,76 +1,53 @@
-# 安装与配置
+# 安装与设置
 
-当前配套版本为 MaiBot **1.4.1**、Plugin SDK **2.21.0**、QQ 连接器 **1.1.13**。默认完整组合请使用本项目构建的主程序和连接器，不能只安装其中一个。
+从已经能运行的 MaiBot 开始。主程序修改和 QQ 连接器只需安装一次，之后按需添加插件。
 
-## 安装顺序
+## 1. 安装主程序修改和 QQ 连接器
 
-1. 停止 MaiBot，备份现有代码、插件、配置和数据。
-2. 使用本项目构建的 Host 和连接器。源码构建方法见[维护说明](maintenance.md#从源码构建)。已有组装包时，`host/` 是主程序，`adapter/` 是要安装的连接器插件。
-3. 按 MaiBot 的安装方式准备 Python 环境，安装 Host 依赖和固定版本 SDK。将连接器与 MaiWeave、MaiHush、MaiIdentity 放入实例插件目录；同一插件只保留一份。
-4. 按各插件 README 设置管理员和管理范围。先确认基础插件可以正常加载，再添加社区插件。
-5. 填写下面的行为控制配置，重启 MaiBot。
+先停止 MaiBot，备份源码、插件、配置和数据。在 MaiTogether 目录运行：
 
-官方安装资料见 [MaiBot 文档](https://docs.maibot.chat/)。README 提供 Host 源码安装命令；源码构建和安装工具不会替你创建账号配置或安装依赖。
+```powershell
+# Windows PowerShell
+python tools/prepare.py --host "../MaiBot" --output "../MaiTogether-ready" --apply
+```
 
-## 选择需要管理的会话
+```bash
+# Linux
+python3 tools/prepare.py --host ../MaiBot --output ../MaiTogether-ready --apply
+```
 
-将 [behavior_control.example.json](../behavior_control.example.json) 复制为实例的 `config/behavior_control.json`，替换示例账号和群号。文件必须是合法 JSON，不能添加注释。
+把 `../MaiBot` 改成已有的主程序源码路径，输出目录须是一个新目录。需要 Git 和 Python 3.11 以上版本；运行 MaiBot 使用它原有的 Python 环境。
 
-1.4.x 中每个 Bot 有自己的实例目录，配置放在对应实例下，不放在共用主程序目录。修改后重启对应 Bot。
+命令会检查主程序版本，下载并制作配套 QQ 连接器，再备份和修改 Host 源码。**当前适用 MaiBot 1.4.2**；版本不同或源码已有修改时会停止，不会自动降级、重置源码或改动数据库。
 
-也可以用环境变量 `MAIBOT_BEHAVIOR_CONFIG` 指定文件路径。该变量会被子进程继承，多实例通常应使用各自的默认路径，避免所有 Bot 误读同一份配置。
+将输出的 `adapter/` 安装到所选 Bot 实例的 `plugins/` 中：
 
-| 字段 | 填写方法 |
-| --- | --- |
-| `enabled` | `true` 开启；`false` 关闭 |
-| `life_provider` | 保留示例中的 MaiWeave 接口设置；状态规则见 [MaiWeave 配置](maiweave.md) |
-| `targets` | 要管理的会话列表，每个群或私聊单独一项 |
-| `platform` | QQ 填 `"qq"` |
-| `account_id` | 机器人自己的 QQ 号，使用字符串 |
-| `scope` | 与连接器的同名设置一致；连接器未设置时填 `null` |
-| `chat_type` | 群聊填 `"group"`，私聊填 `"private"` |
-| `target_id` | 群号或私聊对象的 QQ 号，使用字符串 |
-| `providers` | 群聊通常填 `["life", "hush"]`；私聊可填 `["life"]` |
-| `autonomous_plugins` | 允许在该会话后台自动行动的插件 ID，见下一节 |
-| `cross_target_plugins` | 允许从其他会话发起动作的插件 ID，通常保持 `[]` |
-| `management_commands` | 允许执行 QQ 群管理动作的命令列表，通常保持 `[]` |
+- 首次安装：整个目录复制过去，目录名可改为 `MaiBot-SnowLuma-Adapter`。
+- 已有 SnowLuma 连接器：备份后，用输出目录中的文件覆盖原连接器代码，保留 `config.toml` 和运行数据。同一实例只保留一份连接器。
 
-生活与静音检查针对 `targets` 中列出的会话，账号、群号和 `scope` 必须匹配。MaiWeave 提供全局生活状态，Hush 的受管群也须包含对应群号。开启控制后，未知动作、敏感读取和未授权管理操作仍会拒绝，不因目标未列入名单而自动放行。
+继续使用原来的 SnowLuma 地址、端口和账号设置。无需另备一套干净的 MaiBot，也无需先装原版连接器再打补丁。主程序已经装过修改时，不要重复运行安装命令；升级方法见[更新与恢复](maintenance.md#更新与恢复)。
 
-配置文件不存在时，这项功能默认关闭，核心插件仍按各自原有方式工作。开启后，必要插件加载失败或状态查询超时，会暂停相关动作。
+## 2. 选择插件
 
-## 允许自动行动的插件
+生活和静音组合使用 [MaiWeave](plugins/maiweave.md)、[MaiHush](plugins/maihush.md)、[MaiIdentity](plugins/maiidentity.md)。按各自页面设置作息、受管理群和管理员，其余从[插件清单](plugins.md)按需选择。
 
-示例文件已列入 MaiWeave、Hush 和 Smart Poke。只保留你需要自动行动的插件；名单中的 ID 来自插件的 `_manifest.json`，不是文件夹名。各插件自己的主动功能仍需分别开启。
+插件仍使用自己的安装方式、WebUI 和配置文件。无需为每个插件重复安装 Host 修改或运行开发测试。
 
-如果启用 Cateye 的自动贴表情，将 `github.cateye.set-msg-emoji-like` 加入对应会话的 `autonomous_plugins`。同时按 Cateye 自身配置开启自动功能。
+## 3. 填写机器人账号和群号
 
-这个名单允许插件发起动作，**不免除睡眠、静音和权限检查**。当前聊天中由模型调用的工具，与后台自动行动分别处理；无需为了使用同一会话的表情工具而开启后台权限。
+把输出目录中的 `behavior_control.example.json` 复制到 **Bot 实例的** `config/behavior_control.json`，编辑这两个字段：
 
-`management_commands` 为空时，统一控制不允许踢人、禁言等 QQ 群管理操作。MaiIdentity 的管理员设置仍用于核心插件自己的管理命令；它不会自动开放所有 QQ 管理功能。
+```json
+"account_id": "机器人自己的QQ号",
+"target_id": "要管理的群号"
+```
 
-## 常见问题
+其他设置先保持示例值。管理多个群时，复制 `targets` 中的一整项并分别填写群号；MaiHush 里也添加这些群。文件是 JSON，不支持注释。
 
-**睡眠时为什么还能收到消息？**
+实例目录就是这个 Bot 的 `config/`、`data/`、`plugins/` 所在目录。通过 `maibot run --directory ...` 启动时使用指定目录；直接从源码启动且未设置实例路径时，通常就是主程序目录。
 
-开启 MaiTogether 控制后，受管会话的普通消息只保留原始记录，不会在睡眠期间触发 Planner／Replyer。管理员命令和可信唤醒仍可使用；醒来后从新消息继续，不集中补回旧消息。
+示例已包含[插件清单](plugins.md)中需要后台发送的插件，回复守卫除外，无需逐个添加。不安装或不开启对应插件功能，就不会因此产生动作；发送仍受睡眠和静音限制。
 
-睡眠消息不会自动加入聊天上下文、人物事实或聊天摘要，图片记忆后台任务也会跳过这些消息。原始记录仍可查看；“有记录”不代表麦麦当时参与过聊天。若使用 Focus 共享思考，一名受管成员需要暂停时，共享组也暂停，避免共用上下文绕过限制。
+启动 MaiBot 后，确认三个核心插件和 QQ 连接器已加载。在一个已配置的群里正常聊天，再用管理员账号发送 `/maihush mute 1m`，观察静音和恢复是否符合预期。
 
-已经发起的模型请求可能仍有费用，无法追回。独立社区插件的模型调用和接收阶段的媒体识别不由这项聊天暂停功能统一控制，因此不保证睡眠期间所有模型费用为零。
-
-**生成到一半睡着，草稿会留下来吗？**
-
-发送前仍会复查状态。被拦下的回复不会作为已发言写入聊天记录或长期记忆，也不会把未发送正文带回后续模型上下文。内部只保留发送结果；部分成功或结果不明时不自动重发。模型请求的诊断记录不等于聊天记忆。
-
-**插件为什么不回应？**
-
-先确认 MaiWeave 的生活状态、Hush 是否已静音，再检查自动行动名单与会话配置。日志中的 `behavior_control` 会记录拒绝原因。`sleep_state_ambiguous` 表示当前接口无法确定是否应继续睡眠，`life_state_stale` 表示生活状态长时间未更新。必要插件缺失或超时也会阻止发送，应先排查插件加载和运行情况。
-
-**为什么发文件或多条消息时，只发出了一部分？**
-
-每次实际发送前都会检查。如果期间进入睡眠或静音，后续内容可能停止。不要直接重发整批内容，以免重复发送已经成功的部分。
-
-**QQ 空间是否也受这份配置管理？**
-
-不受。这里检查标准消息和官方 QQ 连接器的动作；QQ 空间使用独立协议，需要相应插件自行检查状态与权限。
+没有这份配置时，统一发送检查默认关闭。**已经开启时，必要插件故障会阻止发送**，原因和处理方法见[常见问题](troubleshooting.md)。私聊、多账号和其他设置见[更多配置](configuration.md)。

@@ -1,12 +1,5 @@
 {
   "enabled": true,
-  "life_provider": {
-    "plugin_id": "ilworkcn.maiweave",
-    "api": "get_life_status",
-    "version": "1",
-    "protocol": "maiweave_status_v1",
-    "max_age_seconds": 180
-  },
   "targets": [
     {
       "platform": "qq",
@@ -18,7 +11,13 @@
       "autonomous_plugins": [
         "ilworkcn.maiweave",
         "davidblackcn.maibot-maihush-plugin",
-        "TAIY2020.smart_poke_plugin"
+        "kamionichan.search_hub",
+        "chartyr.maiwork",
+        "saberlights.smart-segmentation-plugin",
+        "github.cateye.better-post-processing",
+        "TAIY2020.smart_poke_plugin",
+        "github.cateye.set-msg-emoji-like",
+        "github.a0000xz.maibot-tarots-plugin"
       ],
       "cross_target_plugins": []
     }

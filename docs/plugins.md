@@ -1,42 +1,43 @@
 # 插件清单
 
-按需要选择插件，不必全部安装。安装方法与详细配置请参考各插件仓库。
-
 ## 核心插件
 
-| 插件 | 用途 | 本组合使用的版本 |
+| 插件 | 用途 | 仓库 |
 | --- | --- | --- |
-| [MaiHush](https://github.com/DavidBlackCN/maibot-maihush-plugin) | 群静音、恢复发言和发送次数限制 | 0.3.1 |
-| [MaiIdentity](https://github.com/DavidBlackCN/maibot-maiidentity-plugin) | 固定身份提示、管理员名单和命令权限 | 3.4.1 |
-| [MaiWeave](https://github.com/ilworkcn/MaiWeave) | 日程、活动、睡眠、生活经历与主动交流 | [源码基线](../integrations/maiweave/baseline.json)；[配置说明](maiweave.md) |
-| [搜索中枢](https://github.com/kamionichan/maibot-search-hub) | 搜索 | — |
-
-要让其他插件的 QQ 动作也遵守生活状态和静音限制，还需要本项目修改后的 MaiBot 主程序和 QQ 连接器。
+| [MaiHush](plugins/maihush.md) | 群静音与恢复发言 | [DavidBlackCN/maibot-maihush-plugin](https://github.com/DavidBlackCN/maibot-maihush-plugin) |
+| [MaiIdentity](plugins/maiidentity.md) | 固定身份、身份工作区与管理员权限 | [DavidBlackCN/maibot-maiidentity-plugin](https://github.com/DavidBlackCN/maibot-maiidentity-plugin) |
+| [MaiWeave](plugins/maiweave.md) | 日程、活动、睡眠与主动交流 | [ilworkcn/MaiWeave](https://github.com/ilworkcn/MaiWeave) |
+| [搜索中枢](plugins/search-hub.md) | 联网搜索与资料查找 | [kamionichan/maibot-search-hub](https://github.com/kamionichan/maibot-search-hub) |
+| [MaiWork](plugins/maiwork.md) | 自主任务、Agent、Skill、MCP 与文件交付 | [CharTyr/MaiWork](https://github.com/CharTyr/MaiWork) |
 
 ## 回复优化
 
-| 插件 | 用途 |
-| --- | --- |
-| [回复守卫](https://github.com/42yoru/maimai-reply-guard)（评估中） | 回复检查 |
-| [智能分段](https://github.com/saberlights/smart_segmentation_plugin) | 回复分段 |
-| [Cateye 消息后处理](https://github.com/cateyemizuki/cateye_better_post-processing) | 消息后处理 |
-| [Smart Poke](https://github.com/TAIY2020/smart_poke_plugin) | 智能戳一戳 |
-| [Cateye 表情回应](https://github.com/cateyemizuki/cateye_set_msg_emoji_like_api_modify) | 给 QQ 消息贴表情，接收表情通知 |
-| [maibot-corpus-callosum](https://github.com/yufei-pan/maibot-corpus-callosum) | 神经闭环反馈 |
+| 插件 | 用途 | 仓库 |
+| --- | --- | --- |
+| [回复守卫](plugins/reply-guard.md)（评估中） | 检查异常回复 | [42yoru/maimai-reply-guard](https://github.com/42yoru/maimai-reply-guard) |
+| [智能分段](plugins/smart-segmentation.md) | 将回复拆成连续消息 | [HaoxiangXia/smart_segmentation_plugin](https://github.com/HaoxiangXia/smart_segmentation_plugin) |
+| [Cateye 消息后处理](plugins/cateye-post-processing.md) | 引用、分段与消息后处理 | [cateyemizuki/cateye_better_post-processing](https://github.com/cateyemizuki/cateye_better_post-processing) |
+| [Smart Poke](plugins/smart-poke.md) | 智能戳一戳 | [TAIY2020/smart_poke_plugin](https://github.com/TAIY2020/smart_poke_plugin) |
+| [Cateye 表情回应](plugins/cateye-emoji.md) | 给 QQ 消息贴表情 | [cateyemizuki/cateye_set_msg_emoji_like_api_modify](https://github.com/cateyemizuki/cateye_set_msg_emoji_like_api_modify) |
+| [神经闭环反馈](plugins/corpus-callosum.md) | 让回复模型反馈理解偏差 | [yufei-pan/maibot-corpus-callosum](https://github.com/yufei-pan/maibot-corpus-callosum) |
+| [Reply Integrity](plugins/reply-integrity.md) | 让回复器拿到完整事实 | [Zerlight/maibot-reply-integrity](https://github.com/Zerlight/maibot-reply-integrity) |
 
 ## 其他插件
 
+| 插件 | 用途 | 仓库 |
+| --- | --- | --- |
+| [Self-Identity](plugins/self-identity.md) | 麦麦自身的人设资料与图片 | [ValleyWinds/Self-Identity](https://github.com/ValleyWinds/Self-Identity) |
+| [日期上下文](plugins/date-context.md) | 日期、星期、节日与调休参考 | [xiexiaojia780/date_context_plugin](https://github.com/xiexiaojia780/date_context_plugin) |
+| [麦麦梗百科](./plugins/cnmeme.md) | 网络梗、黑话、缩写和谐音词查询 | [YukiSakiko/cnmeme_plugin](https://github.com/YukiSakiko/cnmeme_plugin) |
+| [表情标签桥接](./plugins/emoji-label-bridge.md) | 表情包文字标签转换为真实表情组件 | [46yoru/maimai-emoji-label-bridge](https://github.com/46yoru/maimai-emoji-label-bridge) |
+
+## 娱乐插件
+| 插件 | 用途 | 仓库 |
+| --- | --- | --- |
+| [塔罗工坊](plugins/tarots.md) | 抽牌与解牌 | [A0000Xz/MaiBot-Tarots-Plugin](https://github.com/A0000Xz/MaiBot-Tarots-Plugin) |
+
+## QQ 连接
+
 | 插件 | 用途 |
 | --- | --- |
-| [Self-Identity](https://github.com/ValleyWinds/Self-Identity) | 自我信息 |
-| [MaiBot Tarots](https://github.com/A0000Xz/MaiBot-Tarots-Plugin) | 塔罗牌 |
-| [MaiWork](https://github.com/CharTyr/MaiWork) | Agent 工作系统、多任务、Skill、MCP 与文件交付；使用[配套适配](../integrations/maiwork/README.md) |
-| [日期上下文](https://github.com/xiexiaojia780/date_context_plugin) | 聊天中的日期、节日与调休参考；[配置说明](calendar.md) |
-
-## 搭配说明
-
-Smart Poke 和 Cateye 表情回应的后台自动回应需要列入[允许自动行动的插件名单](setup.md#允许自动行动的插件)。
-
-**Cateye 已知问题**：当前表情回应插件读取机器人账号的字段与 Host 返回格式不一致，可能导致“贴表情成功”的记录未显示在聊天流中。
-
-新增插件时，先确认它通过什么方式发送消息或执行动作。使用官方 QQ 连接器的插件可以共用发送检查；自行调用外部服务的插件需要另行评估。
+| [SnowLuma 连接器](plugins/snowluma.md) | QQ 收发与发送前检查 |
