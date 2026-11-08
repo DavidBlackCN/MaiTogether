@@ -1,4 +1,4 @@
-"""One configured life backend, shared by cognition and external behavior checks."""
+"""One configured life backend for external behavior checks."""
 from dataclasses import dataclass
 import asyncio
 
@@ -6,15 +6,12 @@ from .context import provider_request
 from .life_status import WEAVE_PLUGIN, WEAVE_API, evaluate_status
 
 
-DEFAULT_PLUGIN = 'davidblackcn.maibot-maivita-plugin'
-
-
 @dataclass(frozen=True)
 class LifeProvider:
-    plugin_id: str = DEFAULT_PLUGIN
-    api: str = 'evaluate_behavior'
+    plugin_id: str = WEAVE_PLUGIN
+    api: str = WEAVE_API
     version: str = '1'
-    protocol: str = 'decision_v1'
+    protocol: str = 'maiweave_status_v1'
     max_age_seconds: int = 180
 
     @classmethod
@@ -35,14 +32,10 @@ class LifeProvider:
         return result
 
     def normalize(self, names):
-        """Keep the existing Vita selector as an unambiguous compatibility alias."""
+        """Validate the configured policies without historical plugin aliases."""
         if (not isinstance(names, list) or not names
-                or any(name not in ('vita', 'life', 'hush') for name in names)):
+                or any(name not in ('life', 'hush') for name in names)):
             raise ValueError('Invalid behavior target/providers')
-        if 'vita' in names:
-            if 'life' in names or self != LifeProvider():
-                raise ValueError('Legacy vita selector requires the default Vita backend')
-            names = ['life' if name == 'vita' else name for name in names]
         return [name for name in ('life', 'hush') if name in names]
 
     def _entry(self, supervisor, stream):
@@ -57,7 +50,7 @@ class LifeProvider:
     async def evaluate(self, manager, request):
         if manager is None:
             raise RuntimeError('LIFE_PROVIDER_RUNTIME_UNAVAILABLE')
-        if (request.get('category') not in ('cognition', 'social')
+        if (request.get('category') != 'social'
                 or not isinstance(request.get('stream_id'), str) or not request['stream_id']):
             raise RuntimeError('LIFE_PROVIDER_REQUEST_INVALID')
         supervisor = manager._get_supervisor_for_plugin(self.plugin_id)

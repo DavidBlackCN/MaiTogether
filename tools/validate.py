@@ -6,19 +6,18 @@ import os
 import subprocess
 import sys
 
-from assembly import CONTROL, PROFILES, hashes, inputs_digest
+from assembly import CONTROL, hashes, inputs_digest
 
 CORE_PLUGINS = ('maibot-maihush-plugin', 'maibot-maiIdentity-plugin')
-REQUIRED_CHECKS = {'unit', 'adapter', 'full-control', 'full-community', 'full-sleep',
-                   'behavior-control', 'behavior-community', 'sleep-sleep',
-                   'full-life', 'behavior-life', 'sleep-life', *CORE_PLUGINS}
+REQUIRED_CHECKS = {'unit', 'adapter', 'control', 'community', 'native-chat',
+                   'life', *CORE_PLUGINS}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--candidate', type=Path, required=True)
     parser.add_argument('--workspace', type=Path, required=True)
-    parser.add_argument('--maiweave', type=Path, help='Reviewed latest source for no-Vita acceptance on all build profiles')
+    parser.add_argument('--maiweave', type=Path, help='Reviewed latest source for MaiWeave acceptance')
     parser.add_argument('--maiwork', type=Path, help='Built adaptation; enables work unit and native tests')
     args = parser.parse_args()
     if args.maiwork and not args.maiweave:
@@ -30,42 +29,29 @@ def main():
     pins = json.loads((folder / 'candidate.json').read_text(encoding='utf-8'))
     if not check['applicable'] or check['inputs_digest'] != inputs_digest():
         raise ValueError('Rebuild the candidate after changing maintenance sources or tests')
-    for profile in PROFILES:
-        manifest = json.loads((folder / profile / 'assembly.json').read_text(encoding='utf-8'))
-        if manifest['baseline'] != pins or manifest['inputs_digest'] != inputs_digest():
-            raise ValueError('Mismatched assembly')
-        for kind in ('host', 'adapter'):
-            if hashes(folder / profile / kind) != manifest['files'][kind]:
-                raise ValueError('Assembly changed: ' + profile + '/' + kind)
+    build = folder / 'build'
+    manifest = json.loads((build / 'assembly.json').read_text(encoding='utf-8'))
+    if manifest['baseline'] != pins or manifest['inputs_digest'] != inputs_digest():
+        raise ValueError('Mismatched assembly')
+    for kind in ('host', 'adapter'):
+        if hashes(build / kind) != manifest['files'][kind]:
+            raise ValueError('Assembly changed: ' + kind)
     commands = [('unit', [sys.executable, '-m', 'pytest', str(CONTROL / 'tests'), '-q', '-p', 'no:cacheprovider',
                            '--basetemp=' + str(evidence / 'pytest'), '-o', 'asyncio_default_fixture_loop_scope=function'])]
-    for profile, modes in [('full', ('control', 'community', 'sleep')),
-                           ('behavior', ('control', 'community')), ('sleep', ('sleep',))]:
-        for mode in modes:
-            command = [sys.executable, str(CONTROL / 'tools/run_native.py'), '--workspace', str(args.workspace.resolve()),
-                       '--host', str(folder / profile / 'host'), '--adapter', str(folder / profile / 'adapter'),
-                       '--output', str(evidence / (profile + '-' + mode))]
-            if mode != 'control':
-                command.append('--' + mode)
-            commands.append((profile + '-' + mode, command))
-    for profile, mode, flags in (
-        ('full', 'life', ['--life-provider']),
-        ('behavior', 'life', ['--life-provider']),
-        ('sleep', 'life', ['--life-provider']),
-    ):
-        commands.append((profile + '-' + mode, [sys.executable, str(CONTROL / 'tools/run_native.py'),
-            '--workspace', str(args.workspace.resolve()), '--host', str(folder / profile / 'host'),
-            '--adapter', str(folder / profile / 'adapter'),
-            '--output', str(evidence / (profile + '-' + mode)), *flags]))
+    for mode, flags in (('control', []), ('community', ['--community']),
+                        ('native-chat', ['--native-chat']), ('life', ['--life-provider'])):
+        commands.append((mode, [sys.executable, str(CONTROL / 'tools/run_native.py'),
+            '--workspace', str(args.workspace.resolve()), '--host', str(build / 'host'),
+            '--adapter', str(build / 'adapter'), '--output', str(evidence / mode), *flags]))
     commands.append(('adapter', [sys.executable, str(CONTROL / 'tools/test_adapter.py'),
-                                '--adapter', str(folder / 'full/adapter'), '--temp', str(evidence / 'adapter-pytest')]))
+                                '--adapter', str(build / 'adapter'), '--temp', str(evidence / 'adapter-pytest')]))
     if args.maiweave:
-        for profile in PROFILES:
-            command=[sys.executable,str(CONTROL/'tools/run_native.py'),'--workspace',str(args.workspace.resolve()),
-                '--host',str(folder/profile/'host'),'--adapter',str(folder/profile/'adapter'),
-                '--maiweave',str(args.maiweave.resolve()),'--output',str(evidence/(profile+'-weave'))]
-            if profile=='full' and args.maiwork: command+=['--maiwork',str(args.maiwork.resolve())]
-            commands.append((profile+'-weave',command))
+        command = [sys.executable, str(CONTROL / 'tools/run_native.py'), '--workspace', str(args.workspace.resolve()),
+            '--host', str(build / 'host'), '--adapter', str(build / 'adapter'),
+            '--maiweave', str(args.maiweave.resolve()), '--output', str(evidence / 'weave')]
+        if args.maiwork:
+            command += ['--maiwork', str(args.maiwork.resolve())]
+        commands.append(('weave', command))
     if args.maiwork:
         commands.append(('maiwork-unit',[sys.executable,str(CONTROL/'integrations/maiwork/tests/run.py'),
             '--source',str(args.maiwork.resolve()),'--output',str(evidence/'maiwork-unit')]))
@@ -76,7 +62,7 @@ def main():
     report = {'candidate': pins, 'inputs_digest': inputs_digest(), 'checks': [], 'passed': False,
               'requested_checks':[name for name,_ in commands]}
     env = dict(os.environ, PYTHONUTF8='1', PYTHONDONTWRITEBYTECODE='1',
-               MAITOGETHER_TEST_HOST=str(folder / 'full/host'))
+               MAITOGETHER_TEST_HOST=str(build / 'host'))
     try:
         for name, command in commands:
             with (evidence / (name + '.log')).open('wb') as output:

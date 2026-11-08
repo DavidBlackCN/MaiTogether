@@ -6,6 +6,15 @@ from .context import current
 from .runtime import get_policy, send_outcome
 
 
+def annotate_send_result(capability, args, result):
+    """Attach receipts at the capability boundary, not inside Host send helpers."""
+    if (capability in {'send.text', 'send.emoji', 'send.image', 'send.forward',
+                       'send.hybrid', 'send.command', 'send.custom'}
+            and args.get('return_details') and isinstance(result, dict) and 'sent' in result):
+        return {**result, 'behavior_state': send_outcome(result['sent'])}
+    return result
+
+
 def register(manager, supervisor):
     async def deliver(plugin, capability, request):
         if request.get('version') != 1 or set(request) != {'version', 'operation', 'args'}:

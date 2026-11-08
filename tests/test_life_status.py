@@ -19,7 +19,7 @@ def status(kind='leisure', **values):
 @pytest.mark.parametrize('kind,category,reason', [
     ('leisure','social','available'), ('sleep','social','sleeping'),
     ('work','social','busy'), ('study','work','busy'), ('travel','social','busy'),
-    ('work','cognition','available'), (None,'cognition','sleep_state_ambiguous'),
+    ('work','work','busy'), (None,'social','sleep_state_ambiguous'),
 ])
 def test_activity_rules(kind, category, reason):
     value=status(kind); original=deepcopy(value)
@@ -45,7 +45,7 @@ def test_activity_rules(kind, category, reason):
     (status(awake_until='bad'), 'state_unknown'),
 ])
 def test_sleep_and_health_boundaries(value, reason):
-    assert evaluate_status(value, 'cognition', now=NOW)['reason']==reason
+    assert evaluate_status(value, 'social', now=NOW)['reason']==reason
 
 @pytest.mark.parametrize('field', ['version','ready','enabled','schedule_enabled','updated_at','sleeping','awake_until','current'])
 def test_missing_fields_never_allow(field):
@@ -66,7 +66,9 @@ async def test_public_state_is_only_accepted_with_explicit_official_protocol():
     configured=dict(plugin_id='ilworkcn.maiweave', api='get_life_status', protocol='maiweave_status_v1')
     p=LifeProvider.from_config({'life_provider':configured})
     assert (await p.evaluate(manager, REQUEST))['decision']=='allow'
-    with pytest.raises(RuntimeError): await LifeProvider().evaluate(manager, REQUEST)
+    assert (await LifeProvider().evaluate(manager, REQUEST))['decision']=='allow'
+    with pytest.raises(RuntimeError):
+        await LifeProvider(plugin_id='test.other', api='life_state', protocol='decision_v1').evaluate(manager, REQUEST)
     entry.public=False
     with pytest.raises(RuntimeError): await p.evaluate(manager, REQUEST)
     with pytest.raises(ValueError): LifeProvider.from_config({'life_provider':{**configured,'plugin_id':'other'}})

@@ -28,15 +28,13 @@ async def run_cases(values):
     async def ready(): return bool(get_platform_io_manager().resolve_drivers(RouteKey('qq','123456789',None)))
     await c.wait(ready)
     c.cases.append('maiweave_actual_runner_without_vita_or_coordinate')
-    request={'category':'cognition','stream_id':c.stream,'route':dict(policy.targets[0]),'origin':{'kind':'host'}}
-    async def decision(category='cognition'):
+    request={'category':'social','stream_id':c.stream,'route':dict(policy.targets[0]),'origin':{'kind':'host'}}
+    async def decision(category='social'):
         return await policy._provider('life',{**request,'category':category})
     async def seed(**kwargs): return await c.call(WEAVE,'acceptance_state',kwargs)
     async def work(mode='available',**kwargs):
         return await c.call(WORK,'acceptance_probe',dict(mode=mode,stream_id=c.stream,**kwargs))
     has_work=os.environ.get('MAIWORK_TEST')=='1'
-    if policy.sleep_enabled:
-        from src.plugin_runtime.behavior_policy import sleep_guard as guard
     assert (await decision())['decision']=='allow'
     if policy.behavior_enabled:
         assert await c.probe()
@@ -46,7 +44,7 @@ async def run_cases(values):
         assert len(c.writes)==n+1
         await c.tool('react_emoji',{'message_id':'-999','emoji_id':128512})
         assert len(c.writes)==n+2
-    c.cases.append('public_status_maps_to_cognition_social_and_actual_tools')
+    c.cases.append('public_status_maps_to_policy_queries_and_actual_tools')
     if has_work:
         assert (await work())['available']
         assert (await work('model'))['ok']
@@ -57,14 +55,13 @@ async def run_cases(values):
     for kind,reason in [('work','busy'),('study','busy'),('travel','busy'),('sleep','sleeping')]:
         await seed(kind=kind)
         assert (await decision('social'))['reason']==reason
-        assert (await decision())['decision']==('deny' if kind=='sleep' else 'allow')
         if policy.behavior_enabled:
             n=len(c.writes)
             assert not (await c.probe('api'))['success']
             await c.tool('emoji_like',{'stream_id':c.stream,'target_message_id':'-999','emoji':'128512'})
             assert len(c.writes)==n
         if has_work: assert not (await work())['available']
-    c.cases.append('work_study_travel_block_social_only_sleep_blocks_cognition_too')
+    c.cases.append('work_study_travel_and_sleep_block_social')
     if has_work:
         await seed()
         c.faults.update(hold_model=True,model_started=asyncio.Event(),model_release=asyncio.Event())
@@ -81,45 +78,14 @@ async def run_cases(values):
         assert row['status']=='pending' and row['attempts']==0
         c.cases.append('maiwork_generation_sleep_race_and_new_model_guard')
 
-    if policy.sleep_enabled:
-        from src.chat.heart_flow.heartflow_message_processor import HeartFCMessageReceiver
-        from src.chat.heart_flow.heartflow_manager import heartflow_manager
-        from src.services.memory_flow_service import memory_automation_service
-        from src.common.database.database import get_db_session
-        from src.common.database.database_model import Messages
-        from src.common.data_models.mai_message_data_model import MaiMessage
-        from sqlmodel import select
-        registered=AsyncMock();memory=AsyncMock()
-        message=c.raw('sleep raw only')
-        with patch.object(heartflow_manager,'get_or_create_heartflow_chat',AsyncMock(return_value=SimpleNamespace(register_message=registered))), \
-             patch.object(memory_automation_service,'on_incoming_message',memory):
-            await HeartFCMessageReceiver().process_message(message)
-        registered.assert_not_awaited();memory.assert_not_awaited()
-        with get_db_session() as db:
-            stored=MaiMessage.from_db_instance(db.exec(select(Messages).where(Messages.message_id==message.message_id)).one())
-        assert guard.record_only(stored) and not await guard.memory_allowed(stored)
-        from src.maisaka.chat_loop_service import MaisakaChatLoopService
-        planner=MaisakaChatLoopService.__new__(MaisakaChatLoopService);planner._session_id=c.stream
-        try: await planner.chat_loop_step([])
-        except guard.CognitionPaused: pass
-        else: raise AssertionError('sleeping planner advanced')
-        from src.chat.replyer.maisaka_generator_base import BaseMaisakaReplyGenerator
-        replyer=BaseMaisakaReplyGenerator.__new__(BaseMaisakaReplyGenerator)
-        replyer.express_model=object();replyer._persist_reply_preview=lambda *a,**kw: None
-        ok,result=await replyer.generate_reply_with_context(stream_id=c.stream,chat_history=[])
-        assert not ok and 'sleeping' in result.error_message
-        await seed()
-        assert not await guard.memory_allowed(stored)
-        c.cases.append('sleep_real_receiver_planner_replyer_and_memory_no_draft_replay')
-
-    # Real reception hook can wake before the Host cognition gate, without a model.
+    # Native reception hook can wake without a model.
     await seed(kind='sleep')
     await c.call(WEAVE,'acceptance_person',{'stream_id':c.stream,'user_id':'10001'})
     await c.manager.invoke_hook('chat.receive.after_process',message=serialize_session_message(c.raw('今天心情不好，陪陪我')))
     status=await c.call(WEAVE,'get_life_status')
     assert status['awake_until'],status
     assert (await decision())['decision']=='allow'
-    c.cases.append('upstream_keyword_wake_before_cognition_without_planner')
+    c.cases.append('upstream_keyword_wake_without_planner')
     gap=await seed(kind=None,gap=True)
     assert gap['internal_sleeping'] and not gap['status']['sleeping']
     assert (await decision())['reason']=='sleep_state_ambiguous'

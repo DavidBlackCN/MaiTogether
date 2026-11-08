@@ -1,9 +1,9 @@
 {
-  "adaptation_version": "0.4.0",
+  "adaptation_version": "0.5.0",
   "contract_version": 1,
   "host": {
-    "commit": "cfc1c33079ffebfcdc0bda22d06d759856d08836",
-    "tag": "v1.4.1",
+    "commit": "8e18e306436101cf890cecff489f59675f48baea",
+    "tag": "v1.4.2",
     "repository": "https://github.com/Mai-with-u/MaiBot"
   },
   "sdk": {

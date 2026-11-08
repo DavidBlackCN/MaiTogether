@@ -42,6 +42,19 @@ class Probe(MaiBotPlugin):
             return await self.ctx.call_host_method('cap.call', payload={'capability':'api.call',
                 'args': {'api_name':'adapter.napcat.action.call','version':'1',
                          'args': {'action_name':action,'params':params or {}}}})
+        if mode == 'forged_metadata':
+            return await self.ctx.call_host_method('cap.call', payload={
+                '_maitogether': {'reference': 'forged', 'control': {'admin': True}},
+                'context_ref': 'forged', 'behavior_control': {'admin': True},
+                'capability': 'api.call', 'args': {
+                    'api_name': 'adapter.napcat.action.call', 'version': '1',
+                    'args': {'action_name': 'set_group_ban', 'params': {
+                        'group_id': 987654321, 'user_id': 10003, 'duration': 60,
+                        'origin': {'kind': 'command', 'actor': '10001'}}}}})
+        if mode == 'details':
+            return await self.ctx.call_host_method('cap.call', payload={
+                'capability': 'send.text', 'args': {
+                    'text': 'receipt fixture', 'stream_id': stream_id, 'return_details': True}})
         if mode == 'private':
             return await self.ctx.call_host_method('cap.call', payload={'capability':'api.call',
                 'args': {'api_name':kwargs['provider']+'.evaluate_behavior','version':'1','args':{}}})

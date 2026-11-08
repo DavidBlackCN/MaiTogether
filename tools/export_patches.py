@@ -3,7 +3,7 @@ from pathlib import Path
 import argparse
 import difflib
 import json
-from assembly import CONTROL, PROFILES, baseline, series, upstream, build_pair, lock_path
+from assembly import CONTROL, baseline, series, upstream, build_pair, lock_path
 
 def export(source, working, kind):
     originals = upstream(source, baseline()[kind])
@@ -43,16 +43,15 @@ def main():
     parser.add_argument('--adapter-source', type=Path, required=True)
     parser.add_argument('--host-working', type=Path, required=True)
     parser.add_argument('--adapter-working', type=Path, required=True)
-    parser.add_argument('--output', type=Path, required=True, help='New directory for all profile rebuilds')
+    parser.add_argument('--output', type=Path, required=True, help='New directory for the rebuilt Host and adapter')
     args = parser.parse_args()
     if args.output.exists():
         raise ValueError('Output already exists')
     export(args.host_source, args.host_working, 'host')
     export(args.adapter_source, args.adapter_working, 'adapter')
-    for profile in PROFILES:
-        result = build_pair(args.host_source, args.adapter_source, args.output / profile, profile=profile, verify=False)
-        for kind, files in result['files'].items():
-            lock_path(kind, profile).write_text(json.dumps(files, indent=2)+'\n', encoding='utf-8')
+    result = build_pair(args.host_source, args.adapter_source, args.output, verify=False)
+    for kind, files in result['files'].items():
+        lock_path(kind).write_text(json.dumps(files, indent=2)+'\n', encoding='utf-8')
     print('Locks regenerated; regression validation is still required.')
 
 if __name__ == '__main__':

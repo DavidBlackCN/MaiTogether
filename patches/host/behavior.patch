@@ -1,8 +1,6 @@
-diff --git a/src/platform_io/manager.py b/src/platform_io/manager.py
-index 1114655f2..654d939ab 100644
 --- a/src/platform_io/manager.py
 +++ b/src/platform_io/manager.py
-@@ -592,7 +592,8 @@ class PlatformIOManager:
+@@ -592,7 +592,8 @@
                  continue
  
              try:
@@ -12,25 +10,9 @@ index 1114655f2..654d939ab 100644
              except Exception as exc:
                  receipt = DeliveryReceipt(
                      internal_message_id=message.message_id,
-diff --git a/src/plugin_runtime/capabilities/core.py b/src/plugin_runtime/capabilities/core.py
-index f05c7e338..275bddcf6 100644
---- a/src/plugin_runtime/capabilities/core.py
-+++ b/src/plugin_runtime/capabilities/core.py
-@@ -428,7 +428,8 @@ class RuntimeCoreCapabilityMixin:
-         result: Dict[str, Any] = {"success": sent}
-         if bool(args.get("return_details", False)):
-             message_id = str(sent_message.platform_message_id or "").strip() if sent else ""
--            result.update({"sent": sent, "message_id": message_id or None})
-+            from src.plugin_runtime.behavior_policy.runtime import send_outcome
-+            result.update({"sent": sent, "message_id": message_id or None, "behavior_state": send_outcome(sent)})
-         if error:
-             result["error"] = error
-         return result
-diff --git a/src/plugin_runtime/component_query.py b/src/plugin_runtime/component_query.py
-index fffbf63e1..4dcc17cfa 100644
 --- a/src/plugin_runtime/component_query.py
 +++ b/src/plugin_runtime/component_query.py
-@@ -357,6 +357,8 @@ class ComponentQueryService:
+@@ -357,6 +357,8 @@
              try:
                  response = await supervisor.invoke_plugin(
                      method="plugin.invoke_command",
@@ -39,7 +21,7 @@ index fffbf63e1..4dcc17cfa 100644
                      plugin_id=plugin_id,
                      component_name=component_name,
                      args=invoke_args,
-@@ -782,6 +784,7 @@ class ComponentQueryService:
+@@ -782,6 +784,7 @@
          try:
              response = await supervisor.invoke_plugin(
                  method=tool_entry.invoke_method,
@@ -47,11 +29,9 @@ index fffbf63e1..4dcc17cfa 100644
                  plugin_id=tool_entry.plugin_id,
                  component_name=tool_entry.name,
                  args=invoke_payload,
-diff --git a/src/plugin_runtime/host/hook_dispatcher.py b/src/plugin_runtime/host/hook_dispatcher.py
-index e006cedf9..8307ee469 100644
 --- a/src/plugin_runtime/host/hook_dispatcher.py
 +++ b/src/plugin_runtime/host/hook_dispatcher.py
-@@ -485,6 +485,8 @@ class HookDispatcher:
+@@ -485,6 +485,8 @@
              return HookHandlerExecutionResult(
                  handler_name=target.entry.full_name,
                  plugin_id=target.entry.plugin_id,

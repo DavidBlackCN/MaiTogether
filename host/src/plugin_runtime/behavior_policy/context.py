@@ -32,6 +32,30 @@ outbound: ContextVar[Dict[str, Any] | None] = ContextVar('behavior_outbound', de
 provider_request: ContextVar[Dict[str, Any] | None] = ContextVar('behavior_provider', default=None)
 runner_call: ContextVar[Dict[str, Any] | None] = ContextVar('behavior_runner', default=None)
 
+# Reserved transport metadata, outside component/capability args. The Runner
+# replaces this key on every outbound request; plugins cannot supply authority.
+TRANSPORT_KEY = '_maitogether'
+
+
+def host_payload(component, args, reference, control):
+    return {'component_name': component, 'args': args or {},
+            TRANSPORT_KEY: {'reference': reference, 'control': control}}
+
+
+def runner_payload(payload):
+    return {**payload, TRANSPORT_KEY: {'reference': runner_reference()}}
+
+
+def split_payload(payload, *, from_host=False):
+    clean = dict(payload)
+    metadata = clean.pop(TRANSPORT_KEY, {})
+    permitted = {'reference', 'control'} if from_host else {'reference'}
+    if (not isinstance(metadata, dict) or set(metadata) - permitted
+            or not isinstance(metadata.get('reference', ''), str)
+            or (from_host and not isinstance(metadata.get('control', {}), dict))):
+        raise PermissionError('BEHAVIOR_METADATA_INVALID')
+    return clean, metadata
+
 
 class Contexts:
     def __init__(self):
@@ -87,11 +111,13 @@ contexts = Contexts()
 
 
 @contextmanager
-def runner_scope(envelope):
-    state = {'reference': envelope.context_ref, 'control': deepcopy(envelope.behavior_control), 'active': True}
+def runner_scope(payload):
+    clean, metadata = split_payload(payload, from_host=True)
+    state = {'reference': metadata.get('reference', ''),
+             'control': deepcopy(metadata.get('control', {})), 'active': True}
     token = runner_call.set(state)
     try:
-        yield
+        yield clean
     finally:
         state['active'] = False  # Child tasks share the lifetime marker, not continuing human authority.
         runner_call.reset(token)

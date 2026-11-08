@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 import pytest
 from test_policy import ROUTE, policy, ticket
 from src.plugin_runtime.behavior_policy.context import provider_request
-from src.plugin_runtime.behavior_policy.life import DEFAULT_PLUGIN, LifeProvider, validate_result
+from src.plugin_runtime.behavior_policy.life import LifeProvider, validate_result
 from src.plugin_runtime.behavior_policy.runtime import ADAPTER, BehaviorPolicy
 
 
@@ -15,15 +15,15 @@ def config(names, **extra):
     return {'enabled': True, 'targets': [{**ROUTE, 'providers': names}], **extra}
 
 
-def test_old_and_generic_configs_have_identical_defaults_without_mutating_input():
-    old = config(['hush', 'vita'])
-    copy = deepcopy(old)
-    legacy = BehaviorPolicy(old)
-    modern = BehaviorPolicy(config(['life', 'hush']))
-    assert old == copy
-    assert legacy.targets == modern.targets
-    assert legacy.life == modern.life == LifeProvider()
-    assert legacy.life.plugin_id == DEFAULT_PLUGIN
+def test_default_backend_is_maiweave_without_mutating_input():
+    original = config(['hush', 'life'])
+    copy = deepcopy(original)
+    modern = BehaviorPolicy(original)
+    assert original == copy
+    assert modern.life == LifeProvider()
+    assert modern.life.plugin_id == 'ilworkcn.maiweave'
+    assert modern.life.api == 'get_life_status'
+    assert modern.life.protocol == 'maiweave_status_v1'
     assert BehaviorPolicy(config(['hush'])).targets[0]['providers'] == ['hush']
 
 
@@ -34,6 +34,7 @@ def test_old_and_generic_configs_have_identical_defaults_without_mutating_input(
     ({'life_provider': {'plugin_id': ''}}, ['life']),
     ({'life_provider': {'fallback': True}}, ['life']),
     ({'life_provider': {'plugin_id': 'test.other'}}, ['vita']),
+    ({}, ['vita']),
     ({}, ['life', 'vita']), ({}, ['weave']), ({}, []),
 ])
 def test_invalid_or_ambiguous_configuration_fails(extra, names):
@@ -50,7 +51,7 @@ def backend(result=None):
     return manager, supervisor, entry
 
 
-REQUEST = {'category': 'cognition', 'stream_id': 'real-session', 'route': ROUTE, 'origin': {'kind': 'host'}}
+REQUEST = {'category': 'social', 'stream_id': 'real-session', 'route': ROUTE, 'origin': {'kind': 'host'}}
 
 
 @pytest.mark.asyncio
@@ -62,7 +63,8 @@ async def test_custom_backend_uses_registered_handler_and_internal_context():
         return SimpleNamespace(error=None, payload={'success': True, 'result': {
             'version': 1, 'decision': 'allow', 'reason': 'available'}})
     supervisor.invoke_api = invoke
-    p = BehaviorPolicy(config(['life'], life_provider={'plugin_id': 'test.other', 'api': 'life_state'}))
+    p = BehaviorPolicy(config(['life'], life_provider={
+        'plugin_id': 'test.other', 'api': 'life_state', 'protocol': 'decision_v1'}))
     p.manager = manager
     assert (await p._provider('life', REQUEST))['decision'] == 'allow'
     assert calls == [('test.other', 'handler', {}, 150, REQUEST)]
@@ -91,7 +93,7 @@ async def test_rpc_faults_never_fall_back_and_restore_context(fault):
                 'version': 1, 'decision': 'allow', 'reason': 'available'}})
         supervisor.invoke_api.side_effect = replace
     with pytest.raises((RuntimeError, TimeoutError, asyncio.CancelledError)):
-        await LifeProvider(plugin_id='test.other').evaluate(manager, REQUEST)
+        await LifeProvider(plugin_id='test.other', api='life_state', protocol='decision_v1').evaluate(manager, REQUEST)
     assert provider_request.get() is None
 
 
@@ -111,7 +113,7 @@ def test_invalid_state_is_not_permission(result):
 
 @pytest.mark.parametrize('decision,reason', [('allow', 'available'), ('deny', 'sleeping'),
     ('deny', 'busy'), ('deny', 'not_ready'), ('deny', 'state_unknown'), ('abstain', 'not_managed')])
-def test_vita_v1_states_remain_compatible(decision, reason):
+def test_decision_protocol_states(decision, reason):
     result = {'version': 1, 'decision': decision, 'reason': reason}
     assert validate_result(result) == result
 

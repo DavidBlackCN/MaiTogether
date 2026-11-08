@@ -8,6 +8,21 @@ from src.plugin_runtime.behavior_policy import delivery
 from src.plugin_runtime.behavior_policy.context import contexts,current
 
 
+@pytest.mark.parametrize('states,sent,expected', [
+    (['confirmed'], True, 'confirmed'), (['unknown'], False, 'unknown'),
+    (['confirmed', 'failed'], False, 'partial'), ([], False, 'not_submitted')])
+def test_standard_send_receipts_are_added_without_changing_host_send_helpers(states, sent, expected):
+    with contexts.receive('', 'fixture'):
+        for index, state in enumerate(states):
+            current.get().results.append({'action_id': str(index), 'state': state})
+        result = {'success': sent, 'sent': sent, 'message_id': 'id' if sent else None}
+        annotated = delivery.annotate_send_result('send.text', {'return_details': True}, result)
+        assert annotated == {**result, 'behavior_state': expected}
+        assert 'behavior_state' not in result
+        assert delivery.annotate_send_result('send.text', {}, result) is result
+        assert delivery.annotate_send_result('api.call', {'return_details': True}, result) is result
+
+
 def setup(monkeypatch, impl, allowed=True):
     registry={}
     auth=SimpleNamespace(check_capability=lambda p,c:(allowed,'denied'))

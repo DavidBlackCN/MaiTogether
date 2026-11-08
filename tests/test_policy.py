@@ -32,7 +32,9 @@ def test_each_bot_reads_its_own_policy_file(tmp_path, monkeypatch):
 
 
 def policy():
-    p = BehaviorPolicy({'enabled': True, 'targets': [{**ROUTE, 'providers': ['vita', 'hush'],
+    p = BehaviorPolicy({'enabled': True,
+                       'life_provider': {'plugin_id': 'test.life', 'api': 'life_state', 'protocol': 'decision_v1'},
+                       'targets': [{**ROUTE, 'providers': ['life', 'hush'],
                                                      'autonomous_plugins': [ADAPTER]}]})
     async def route(args): pass
     async def resolve(args): return 'real-session'
@@ -124,7 +126,7 @@ async def test_background_task_loses_completed_human_reference():
     async def background():
         await event.wait()
         return runner_reference()
-    with runner_scope(SimpleNamespace(context_ref='human', behavior_control={})):
+    with runner_scope({'_maitogether': {'reference': 'human', 'control': {}}}):
         assert runner_reference() == 'human'
         task = asyncio.create_task(background())
     event.set()
@@ -133,7 +135,7 @@ async def test_background_task_loses_completed_human_reference():
 
 def test_required_provider_configuration_is_explicit_and_ordered():
     with pytest.raises(ValueError): BehaviorPolicy({'enabled':True,'targets':[]})
-    target={**ROUTE,'providers':['hush','vita']}
+    target={**ROUTE,'providers':['hush','life']}
     p=BehaviorPolicy({'enabled':True,'targets':[target]})
     assert p.targets[0]['providers']==['life','hush']
     with pytest.raises(ValueError): BehaviorPolicy({'enabled':True,'targets':[target,target]})

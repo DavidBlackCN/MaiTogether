@@ -10,16 +10,14 @@ async def run_cases(values):
     from src.plugin_runtime.behavior_policy.life import LifeProvider
 
     original = runtime.get_policy()
-    if original.sleep_enabled:
-        from src.plugin_runtime.behavior_policy import sleep_guard
-    request = dict(category='cognition', action='host.cognition', stream_id=c.stream,
+    request = dict(category='social', action='send_poke', stream_id=c.stream,
                    route=dict(original.targets[0]), origin={'kind': 'host'})
     initial = await original._provider('life', request)
     assert initial['decision'] == 'allow', initial
     c.cases.append('configured_life_uses_registered_private_v1')
     # Change only the configuration in this isolated Host; no Vita implementation is reused.
     custom = runtime.BehaviorPolicy({'enabled': True, 'targets': original.targets,
-        'life_provider': {'plugin_id': PROBE, 'api': 'fixture_life', 'version': '1'}})
+        'life_provider': {'plugin_id': PROBE, 'api': 'fixture_life', 'version': '1', 'protocol': 'decision_v1'}})
     custom.manager = c.manager
     def select(policy):
         # Rebind the Host capability as startup does; changing the singleton alone
@@ -30,7 +28,6 @@ async def run_cases(values):
         select(custom)
         assert (await c.supervisor.unload_plugins([LIFE], reason='independent-life-test')).success
         assert (await custom._provider('life', request))['decision'] == 'allow'
-        if custom.sleep_enabled: assert not await sleep_guard.pause_reason(c.stream)
         if custom.behavior_enabled:
             assert (await c.probe('api'))['success']
         c.cases.append('unrelated_provider_allows_without_default_provider_loaded')
@@ -51,8 +48,6 @@ async def run_cases(values):
                 try: await custom._provider('life', request)
                 except RuntimeError: pass
                 else: raise AssertionError('invalid registered contract allowed')
-                if custom.sleep_enabled:
-                    assert await sleep_guard.pause_reason(c.stream) == 'life_state_unavailable'
             finally: setattr(entry, field, old)
         c.cases.append('registered_api_version_visibility_and_enabled_checked')
 
@@ -64,7 +59,6 @@ async def run_cases(values):
             ({'version': 1, 'decision': 'allow', 'reason': 'available'}, .5),
         ]:
             await c.call(PROBE, 'set_fixture_life', {'result': result, 'delay': delay})
-            if custom.sleep_enabled: assert await sleep_guard.pause_reason(c.stream)
             before = len(c.writes)
             if custom.behavior_enabled:
                 assert not (await c.probe('api'))['success']
@@ -72,7 +66,6 @@ async def run_cases(values):
         c.cases.append('sleep_unknown_not_ready_version_and_timeout_fail_closed')
 
         assert (await c.supervisor.unload_plugins([PROBE], reason='provider-unload-test')).success
-        if custom.sleep_enabled: assert await sleep_guard.pause_reason(c.stream) == 'life_state_unavailable'
         try: await custom._provider('life', request)
         except RuntimeError: pass
         else: raise AssertionError('missing provider fell back')
@@ -84,6 +77,5 @@ async def run_cases(values):
         assert await c.supervisor.reload_plugins([LIFE], reason='restore-original-life')
         await c.wait(c.ready)
     assert (await original._provider('life', request))['decision'] == 'allow'
-    if original.sleep_enabled: assert not await sleep_guard.pause_reason(c.stream)
     if original.behavior_enabled: assert (await c.probe('api'))['success']
     c.cases.append('rollback_to_original_life_config_restores_operation')

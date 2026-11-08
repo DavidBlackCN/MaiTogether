@@ -29,17 +29,16 @@ def official(tmp_path, monkeypatch):
     (control / 'host').mkdir()
     (control / 'host/helper.py').write_text('helper = True\n', encoding='utf-8')
     (control / 'baseline.json').write_text(json.dumps({'host': pin}))
-    (control / 'patches/series.json').write_text(json.dumps({'groups': {'behavior': {
+    (control / 'patches/series.json').write_text(json.dumps({'default': ['behavior'], 'groups': {'behavior': {
         'requires': [], 'host': {'patch': 'patches/test.patch', 'files': ['main.py'], 'modules': ['helper.py']}}}}))
     (source / 'main.py').write_text('value = 2\n', encoding='utf-8')
     (control / 'patches/test.patch').write_bytes(assembly.normalize(assembly.git(source, 'diff')))
     assembly.git(source, 'checkout', '--', 'main.py')
     monkeypatch.setattr(assembly, 'CONTROL', control)
-    monkeypatch.setitem(assembly.PROFILES, 'full', ('behavior',))
     staged = tmp_path / 'staged'
     files = assembly.assemble(source, 'host', staged, verify=False)
     (control / 'locks').mkdir()
-    assembly.lock_path('host', 'full').write_text(json.dumps(files))
+    assembly.lock_path('host').write_text(json.dumps(files))
     return source, control
 
 

@@ -4,7 +4,7 @@ import argparse
 import json
 import urllib.request
 
-from assembly import CONTROL, PROFILES, baseline, build_pair, git, hashes, inputs_digest, lock_path, series, upstream
+from assembly import CONTROL, baseline, build_pair, git, hashes, inputs_digest, lock_path, series, upstream
 from validate import REQUIRED_CHECKS
 
 
@@ -40,16 +40,13 @@ def check(args):
         new = upstream(sources[kind], candidate[kind])
         owned = {name for spec in series()['groups'].values() for name in spec.get(kind, {}).get('files', [])}
         impact[kind] = sorted(name for name in owned if old.get(name) != new.get(name))
-    report = {'inputs_digest': inputs_digest(), 'stable_releases': releases, 'upstream_changed_files': impact,
-              'profiles': {}, 'regression_required': True}
-    for profile in PROFILES:
-        try:
-            build_pair(sources['host'], sources['adapter'], out / profile,
-                       profile=profile, pins=candidate, verify=False)
-            report['profiles'][profile] = {'applied': True}
-        except Exception as exc:
-            report['profiles'][profile] = {'applied': False, 'error': str(exc)}
-    report['applicable'] = all(item['applied'] for item in report['profiles'].values())
+    report = {'inputs_digest': inputs_digest(), 'stable_releases': releases,
+              'upstream_changed_files': impact, 'regression_required': True}
+    try:
+        build_pair(sources['host'], sources['adapter'], out / 'build', pins=candidate, verify=False)
+        report['applicable'] = True
+    except Exception as exc:
+        report.update(applicable=False, error=str(exc))
     (out / 'upgrade-check.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(report, ensure_ascii=False, indent=2))
     if not report['applicable']:
@@ -71,18 +68,15 @@ def promote(args):
     for kind in ('host', 'sdk', 'adapter'):
         if latest(pins[kind])['tag_name'] != pins[kind]['tag']:
             raise ValueError('A newer stable release is available: ' + kind)
-    manifests = {}
-    for profile in PROFILES:
-        assembly = json.loads((folder / profile / 'assembly.json').read_text(encoding='utf-8'))
-        if assembly['baseline'] != pins or assembly['inputs_digest'] != inputs_digest():
-            raise ValueError('Candidate baseline changed: ' + profile)
-        for kind in ('host', 'adapter'):
-            if hashes(folder / profile / kind) != assembly['files'][kind]:
-                raise ValueError('Validated output changed: ' + profile + '/' + kind)
-            manifests[(kind, profile)] = assembly['files'][kind]
+    assembled = json.loads((folder / 'build/assembly.json').read_text(encoding='utf-8'))
+    if assembled['baseline'] != pins or assembled['inputs_digest'] != inputs_digest():
+        raise ValueError('Candidate baseline changed')
+    for kind in ('host', 'adapter'):
+        if hashes(folder / 'build' / kind) != assembled['files'][kind]:
+            raise ValueError('Validated output changed: ' + kind)
     (CONTROL / 'baseline.json').write_text(json.dumps(pins, indent=2) + '\n', encoding='utf-8')
-    for (kind, profile), files in manifests.items():
-        lock_path(kind, profile).write_text(json.dumps(files, indent=2) + '\n', encoding='utf-8')
+    for kind, files in assembled['files'].items():
+        lock_path(kind).write_text(json.dumps(files, indent=2) + '\n', encoding='utf-8')
     print('Validated stable baseline promoted. No running instance was modified.')
 
 

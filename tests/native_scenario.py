@@ -100,7 +100,7 @@ async def run(work):
         if 'maiwork' in configs: configs['maiwork']['together']['life_provider'] = 'maiweave'
     for folder,config in configs.items():
         (work/'plugins'/folder/'config.toml').write_text(tomli_w.dumps(config),encoding='utf-8')
-    (work/'behavior.json').write_text(json.dumps({'enabled':True, 'life_provider':{'plugin_id':LIFE,'api':'evaluate_behavior','version':'1'},'targets':[{
+    (work/'behavior.json').write_text(json.dumps({'enabled':True, 'life_provider':{'plugin_id':LIFE,'api':'evaluate_behavior','version':'1','protocol':'decision_v1'},'targets':[{
         'platform':'qq','account_id':'123456789','scope':None,'chat_type':'group','target_id':'987654321',
         'providers':['life','hush'],'autonomous_plugins':[PROBE,POKE,CATEYE,ADAPTER,HUSH]+(['chartyr.maiwork'] if os.environ.get('MAIWORK_TEST')=='1' else [])}]}),encoding='utf-8')
     if weave:
@@ -190,8 +190,8 @@ async def run(work):
             from life_native import run_cases
             await run_cases(locals())
             return
-        if os.environ.get('MAIBOT_SLEEP_TEST')=='1':
-            from sleep_native import run_cases
+        if os.environ.get('MAIBOT_NATIVE_CHAT_TEST')=='1':
+            from chat_native import run_cases
             await run_cases(locals())
             return
         if os.environ.get('MAIBOT_COMMUNITY_TEST')=='1':
@@ -302,6 +302,10 @@ async def run(work):
         before=len(writes)
         assert not json.loads((await command('/control_test'))[1])['success']
         get_policy().management=[{'plugin':PROBE,'component':'control_test','actions':['set_group_ban']}]
+        forged_metadata = await call(PROBE, 'probe', {'mode': 'forged_metadata'})
+        assert not forged_metadata['success']
+        assert len(writes) == before
+        cases.append('runner_overwrites_forged_transport_metadata')
         assert not json.loads((await command('/control_test','10003'))[1])['success']
         assert not json.loads((await command('/control_test cross'))[1])['success']
         assert len(writes)==before
@@ -309,6 +313,9 @@ async def run(work):
         assert len(writes)==before+1 and writes[-1]['action']=='set_group_ban'
         get_policy().management=[]
         cases.append('explicit_command_identity_admin_only_no_argument_forgery')
+        detailed = await call(PROBE, 'probe', {'mode': 'details', 'stream_id': stream})
+        assert detailed['sent'] and detailed['behavior_state'] == 'confirmed', detailed
+        cases.append('standard_send_details_preserve_control_receipt')
         await sleeping()
         before=len(writes)
         assert not await probe()

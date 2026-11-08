@@ -7,7 +7,6 @@ import subprocess
 import zipfile
 
 CONTROL = Path(__file__).resolve().parents[1]
-PROFILES = {'full': ('behavior', 'sleep'), 'behavior': ('behavior',), 'sleep': ('sleep',)}
 
 
 def git(source, *args):
@@ -47,9 +46,10 @@ def series():
     return json.loads((CONTROL / 'patches/series.json').read_text(encoding='utf-8'))
 
 
-def groups(profile):
-    selected = PROFILES[profile]
-    spec = series()['groups']
+def groups():
+    manifest = series()
+    selected = manifest['default']
+    spec = manifest['groups']
     ordered = []
     def visit(name):
         if name in ordered:
@@ -70,12 +70,11 @@ def upstream(source, pin):
                 if not entry.is_dir()}
 
 
-def lock_path(kind, profile):
-    suffix = '' if profile == 'full' else '-' + profile
-    return CONTROL / 'locks' / f'{kind}{suffix}-files.json'
+def lock_path(kind):
+    return CONTROL / 'locks' / f'{kind}-files.json'
 
 
-def assemble(source, kind, target, *, profile='full', pins=None, verify=True):
+def assemble(source, kind, target, *, pins=None, verify=True):
     pins = pins or baseline()
     target = target.resolve()
     target.mkdir(parents=True, exist_ok=False)
@@ -85,7 +84,7 @@ def assemble(source, kind, target, *, profile='full', pins=None, verify=True):
             raise ValueError('Unsafe upstream path')
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(data)
-    for group, spec in groups(profile):
+    for group, spec in groups():
         item = spec.get(kind)
         if item is None:
             continue
@@ -101,26 +100,23 @@ def assemble(source, kind, target, *, profile='full', pins=None, verify=True):
                 raise ValueError(f'{kind}/{group}: upstream now owns {name}')
             dest.parent.mkdir(parents=True, exist_ok=True)
             data = normalize((CONTROL / kind / name).read_bytes())
-            if name.endswith('/build_features.py') and profile != 'full':
-                data = (f'"""Generated build features; do not edit in a running instance."""\n'
-                        f'FEATURES = frozenset({PROFILES[profile]!r})\n').encode()
             dest.write_bytes(data)
     actual = hashes(target)
     if verify:
-        expected = json.loads(lock_path(kind, profile).read_text(encoding='utf-8'))
+        expected = json.loads(lock_path(kind).read_text(encoding='utf-8'))
         if actual != expected:
             changed = sorted(k for k in set(actual) | set(expected) if actual.get(k) != expected.get(k))
-            raise ValueError(f'{kind}/{profile}: hash mismatch: {changed[:10]}')
+            raise ValueError(f'{kind}: hash mismatch: {changed[:10]}')
     return actual
 
 
-def build_pair(host_source, adapter_source, output, *, profile='full', pins=None, verify=True):
+def build_pair(host_source, adapter_source, output, *, pins=None, verify=True):
     output = output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     pins = pins or baseline()
-    result = {kind: assemble(source, kind, output / kind, profile=profile, pins=pins, verify=verify)
+    result = {kind: assemble(source, kind, output / kind, pins=pins, verify=verify)
               for kind, source in (('host', host_source), ('adapter', adapter_source))}
-    manifest = {'profile': profile, 'baseline': pins, 'inputs_digest': inputs_digest(), 'files': result}
+    manifest = {'baseline': pins, 'inputs_digest': inputs_digest(), 'files': result}
     (output / 'assembly.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     (output / 'baseline.json').write_text(json.dumps(pins, indent=2) + '\n', encoding='utf-8')
     return manifest

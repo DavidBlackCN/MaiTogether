@@ -30,7 +30,7 @@ Each caller obtains a fresh response; this function does not cache permissions.
     result = {'version': 1, 'decision': 'deny', 'reason': 'state_unknown'}
     def deny(reason):
         return {**result, 'reason': reason}
-    if (category not in ('cognition', 'social', 'work')
+    if (category not in ('social', 'work')
             or type(max_age_seconds) is not int or not 10 <= max_age_seconds <= 3600):
         return deny('invalid_life_query')
     if (not isinstance(status, dict) or type(status.get('version')) is not int
@@ -74,6 +74,6 @@ Each caller obtains a fresh response; this function does not cache permissions.
         if awake is None and activity is None:
             # v1 omits the stored sleep_end used internally after temporary waking.
             return deny('sleep_state_ambiguous')
-    if category in ('social', 'work') and activity is not None and activity['kind'] in BUSY_KINDS:
+    if activity is not None and activity['kind'] in BUSY_KINDS:
         return deny('busy')
     return {**result, 'decision': 'allow', 'reason': 'available'}

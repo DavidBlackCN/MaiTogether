@@ -20,7 +20,7 @@ class LifeFixture(MaiBotPlugin):
         request = self.ctx.behavior_context().get('request')
         if not isinstance(request, dict):
             return {'version': 1, 'decision': 'deny', 'reason': 'untrusted_request'}
-        denied = self.state == 'sleeping' or (self.state == 'busy' and request.get('category') != 'cognition')
+        denied = self.state in ('sleeping', 'busy')
         return {'version': 1, 'decision': 'deny' if denied else 'allow',
                 'reason': self.state if denied else 'available'}
 

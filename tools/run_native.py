@@ -77,7 +77,7 @@ def main():
     parser.add_argument('--host',type=Path,default=ROOT/'maibot')
     parser.add_argument('--adapter',type=Path,default=ROOT/'.implementation/behavior-control/adapter')
     parser.add_argument('--community',action='store_true',help='Focused unchanged-community plugin acceptance')
-    parser.add_argument('--sleep',action='store_true',help='Sleeping cognition and automatic memory acceptance')
+    parser.add_argument('--native-chat',action='store_true',help='Official reception and memory continue while outbound sleep control remains active')
     parser.add_argument('--life-provider',action='store_true',help='Generic Life Provider and unavailable-backend acceptance')
     parser.add_argument('--maiwork',type=Path,help='Assembled MaiWork adaptation for isolated acceptance')
     parser.add_argument('--maiweave',type=Path,help='Latest reviewed MaiWeave source; Vita and Coordinate are not installed')
@@ -99,7 +99,7 @@ def main():
         raise RuntimeError('Installed SDK does not match the candidate baseline')
     work = (args.output or ROOT / ('.implementation/behavior-control/native-' + str(time.time_ns()))).resolve()
     work.mkdir(parents=True, exist_ok=False)
-    if args.maiweave and any((args.life_provider,args.sleep,args.community)):
+    if args.maiweave and any((args.life_provider,args.native_chat,args.community)):
         parser.error('--maiweave selects its own acceptance scenario')
     stage(work,args.adapter.resolve(),args.workspace.resolve(),pins,args.maiweave)
     if args.maiwork:
@@ -127,7 +127,7 @@ def main():
         PYTHONPATH=os.pathsep.join([str(safety), str(CONTROL / 'tests'), str(CONTROL/'integrations/maiwork/tests'), str(args.workspace.resolve()/'tools'), str(args.host.resolve())]),
         MAIBOT_HOST_VERSION=pins['host']['tag'].removeprefix('v'), MAIBOT_INSTANCE_DIR=str(work),
         MAIBOT_COMMUNITY_TEST=str(int(args.community)),
-        MAIBOT_SLEEP_TEST=str(int(args.sleep)),
+        MAIBOT_NATIVE_CHAT_TEST=str(int(args.native_chat)),
         MAIBOT_LIFE_TEST=str(int(args.life_provider)),
         MAIWORK_TEST=str(int(bool(args.maiwork))),
         MAIWEAVE_TEST=str(int(bool(args.maiweave))),
@@ -150,7 +150,7 @@ def main():
     else:
         result=json.loads((work/'result.json').read_text(encoding='utf-8'))
         (work/'acceptance.json').write_text(json.dumps({
-            'passed':True,'kind':'maiweave' if args.maiweave else 'life-provider' if args.life_provider else 'maiwork' if args.maiwork else 'community' if args.community else 'sleep' if args.sleep else 'behavior',
+            'passed':True,'kind':'maiweave' if args.maiweave else 'life-provider' if args.life_provider else 'maiwork' if args.maiwork else 'community' if args.community else 'native-chat' if args.native_chat else 'behavior',
             'baseline':pins,'cases':result['cases'],
             'maiweave':weave_pin,
             'sources_sha256':hashlib.sha256((work/'sources.json').read_bytes()).hexdigest(),

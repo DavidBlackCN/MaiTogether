@@ -13,7 +13,6 @@ import time
 
 from .actions import MESSAGE_TARGET, category, fingerprint, text_digest
 from .context import contexts, current, outbound, provider_request, live
-from .build_features import FEATURES
 from .life import LifeProvider
 
 ADAPTER = 'maibot-team.snowluma-adapter'
@@ -71,11 +70,7 @@ class BehaviorPolicy:
 
     @property
     def behavior_enabled(self):
-        return self.enabled and 'behavior' in FEATURES
-
-    @property
-    def sleep_enabled(self):
-        return self.enabled and 'sleep' in FEATURES
+        return self.enabled
 
     def check_origin(self, origin, stream, target):
         if origin.get('kind') == 'background' and origin.get('plugin') not in target.get('autonomous_plugins', []):
