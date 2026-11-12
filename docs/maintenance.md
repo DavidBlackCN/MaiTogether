@@ -11,7 +11,7 @@
 | `host/`、`adapter/` | 本项目新增模块，不是完整安装目录 |
 | `patches/` | 对官方文件的修改；`series.json` 列出修改范围 |
 | `locks/` | 完整 Host 和连接器的两份文件校验清单 |
-| `integrations/` | MaiWeave、MaiWork 的固定源码、适配补丁和构建工具 |
+| `integrations/` | MaiWeave 的接口与测试记录；MaiWork 的适配补丁和构建工具 |
 | `tools/`、`tests/` | 安装、构建、升级和验证工具 |
 | `docs/plugins/` | 每个选用插件的版本、配置和搭配说明 |
 
@@ -68,7 +68,7 @@ python tools/run_native.py --life-provider --workspace .. --host ../control-buil
 
 `--native-chat` 检查消息仍进入官方聊天、记忆处理入口，同时睡眠会阻止对外动作。它不验证真实模型的理解与生成效果。
 
-MaiWeave 完整组合另传 `--maiweave <已构建适配>`；工作联动再加 `--maiwork <已构建适配>`。构建方法分别见 [MaiWeave](../integrations/maiweave/README.md) 和 [MaiWork](../integrations/maiwork/README.md)。两者都会检查来源、补丁和文件哈希。先审查 MaiWeave 当时默认分支最新源码并更新准确提交记录，不把旧版本结果套用到新版本。Host 回归不等于这两项完整组合通过。
+MaiWeave 完整组合另传 `--maiweave <上游原版源码>`；加 `--maiweave-smoke` 可单独检查未经测试入口改写的原版加载。工作联动再加 `--maiwork <已构建适配>`。接口测试与构建方法分别见 [MaiWeave](../integrations/maiweave/README.md) 和 [MaiWork](../integrations/maiwork/README.md)。MaiWeave 检查干净上游提交，MaiWork 另检查补丁和文件哈希。先审查 MaiWeave 当时默认分支最新源码并更新准确提交记录，不把旧版本结果套用到新版本。Host 回归不等于完整组合通过。
 
 同时验证消息后处理与智能分段时，再传 `--post-processing <Cateye源码> --segmentation <智能分段源码>`，测试配置会关闭 Cateye 分段。
 

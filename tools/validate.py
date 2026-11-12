@@ -17,7 +17,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--candidate', type=Path, required=True)
     parser.add_argument('--workspace', type=Path, required=True)
-    parser.add_argument('--maiweave', type=Path, help='Assembled MaiWeave adaptation for acceptance')
+    parser.add_argument('--maiweave', type=Path, help='Clean reviewed upstream MaiWeave source for acceptance')
     parser.add_argument('--maiwork', type=Path, help='Built adaptation; enables work unit and native tests')
     args = parser.parse_args()
     if args.maiwork and not args.maiweave:
@@ -54,6 +54,10 @@ def main():
         if args.maiwork:
             command += ['--maiwork', str(args.maiwork.resolve())]
         commands.append(('weave', command))
+        commands.append(('weave-original-load', [sys.executable, str(CONTROL / 'tools/run_native.py'),
+            '--workspace', str(args.workspace.resolve()), '--host', str(build / 'host'),
+            '--adapter', str(build / 'adapter'), '--maiweave', str(args.maiweave.resolve()),
+            '--maiweave-smoke', '--output', str(evidence / 'weave-original-load')]))
     if args.maiwork:
         commands.append(('maiwork-unit',[sys.executable,str(CONTROL/'integrations/maiwork/tests/run.py'),
             '--source',str(args.maiwork.resolve()),'--output',str(evidence/'maiwork-unit')]))

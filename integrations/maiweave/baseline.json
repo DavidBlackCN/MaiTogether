@@ -15,6 +15,5 @@
     "sdk": "2.22.1",
     "mode": "isolated"
   },
-  "production_ready": false,
-  "adaptation": "1.0.1"
+  "production_ready": false
 }

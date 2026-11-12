@@ -78,12 +78,12 @@ async def run_cases(values):
         await c.tool('react_emoji',{'message_id':'-999','emoji_id':128512})
         assert len(c.writes)==n+2
     c.cases.append('public_status_maps_to_policy_queries_and_actual_tools')
-    assert (await c.call(WEAVE, 'acceptance_delivery', {'mode': 'message', 'stream_id': c.stream}))['state'] == 'confirmed'
+    assert (await c.call(WEAVE, 'acceptance_delivery', {'mode': 'message', 'stream_id': c.stream}))['sent'] is True
     result = await publish('normal')
     assert result['status'] == '已发布', result
     await seed(kind='sleep'); n = len(c.writes)
     result = await publish('sleep')
-    assert result['state'] == 'deferred' and result['status'] == '草稿', result
+    assert result['status'] == '待核对', result
     assert len(c.writes) == n
     await seed()
     assert (await c.command('/maihush mute 5m'))[0]
@@ -92,7 +92,10 @@ async def run_cases(values):
     c.faults['drop'] = 'send_qzone_msg'
     result = await publish('unknown')
     c.faults['drop'] = ''
-    assert result['state'] == 'unknown' and result['status'] == '待核对', result
+    assert result['status'] == '待核对', result
+    n = len(c.writes)
+    assert (await publish('unknown'))['status'] == '待核对'
+    assert len(c.writes) == n
     c.cases.append('maiweave_real_sdk_delivery_space_sleep_hush_unknown')
     entered, release = asyncio.Event(), asyncio.Event()
     async def reply_fixture(plugin_id, capability, args):
@@ -105,10 +108,10 @@ async def run_cases(values):
     await seed(kind='sleep'); n = len(c.writes)
     release.set()
     rows = await task
-    assert rows[-1]['delivery_state'] == 'deferred', rows
+    assert rows[-1]['outcome'] == '发送失败', rows
     assert len(c.writes) == n
     await seed()
-    c.cases.append('maiweave_generation_sleep_race_defers_before_submission')
+    c.cases.append('upstream_share_generation_sleep_race_blocked_before_submission')
     if has_work:
         assert (await work())['available']
         assert (await work('model'))['ok']

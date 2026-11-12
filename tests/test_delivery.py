@@ -61,6 +61,16 @@ async def test_original_capability_permission_still_required(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_space_uses_adapter_api_not_private_delivery(monkeypatch):
+    impl = AsyncMock()
+    fn = setup(monkeypatch, impl)
+    with contexts.receive('', 'fixture'):
+        with pytest.raises(ValueError, match='DELIVERY_OPERATION_INVALID'):
+            await fn('fixture', 'behavior.send_v1', {'version': 1, 'operation': 'space', 'args': {}})
+    impl.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_concurrent_deliveries_do_not_share_receipts(monkeypatch):
     async def impl(plugin,cap,args):
         current.get().results.append({'action_id':'id','state':args['state']})

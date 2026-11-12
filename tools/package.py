@@ -26,6 +26,8 @@ def copy_files(source,target,names):
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--workspace',type=Path,required=True)
     p.add_argument('--output',type=Path,required=True)
+    p.add_argument('--host-source',type=Path,help='Official Host Git checkout containing the locked commit')
+    p.add_argument('--adapter-source',type=Path,help='Official adapter Git checkout containing the locked commit')
     p.add_argument('--maiwork-source',type=Path,help='Include the pinned MaiWork adaptation')
     p.add_argument('--maiweave-source',type=Path,help='Include the reviewed MaiWeave source')
     a=p.parse_args()
@@ -40,7 +42,8 @@ def main():
     out.mkdir(parents=True)
     for kind,prefix in [('host','Host'),('adapter','QQ-Adapter')]:
         folder=prefix+'-'+baseline[kind]['tag'].removeprefix('v')
-        build(root/'.implementation/vendor'/folder,kind,out/kind)
+        source=getattr(a,kind+'_source') or root/'.implementation/vendor'/folder
+        build(source,kind,out/kind)
     pins={}
     core=('maibot-maiIdentity-plugin','maibot-maihush-plugin')
     for folder in core:
@@ -52,17 +55,10 @@ def main():
                       'version':json.loads((source/'_manifest.json').read_text(encoding='utf-8'))['version']}
     if a.maiweave_source:
         source=a.maiweave_source.resolve()
-        pin=json.loads((CONTROL/'integrations/maiweave/baseline.json').read_text(encoding='utf-8'))
-        if git(source,'status','--porcelain').strip() or git(source,'rev-parse','HEAD').decode().strip()!=pin['commit']:
-            raise ValueError('MaiWeave source differs from the reviewed clean commit')
-        spec=importlib.util.spec_from_file_location('weave_build',CONTROL/'integrations/maiweave/build.py')
+        spec=importlib.util.spec_from_file_location('weave_source',CONTROL/'integrations/maiweave/source.py')
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-        assembled=out/'maiweave-assembly'
-        module.build(source,assembled)
-        copy_files(assembled,out/'plugins/MaiWeave',
-                   [p.relative_to(assembled).as_posix() for p in assembled.rglob('*') if p.is_file()])
-        shutil.rmtree(assembled)
-        pins['MaiWeave']=pin
+        pins['MaiWeave']=module.verify(source)
+        copy_files(source,out/'plugins/MaiWeave',tracked_files(source))
     if a.maiwork_source:
         spec=importlib.util.spec_from_file_location('maiwork_build',CONTROL/'integrations/maiwork/build.py')
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)

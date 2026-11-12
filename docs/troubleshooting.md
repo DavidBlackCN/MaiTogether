@@ -13,7 +13,7 @@
 | 原因 | 先检查什么 |
 | --- | --- |
 | `life:sleeping`、`life:busy` | MaiWeave 当前生活状态 |
-| `state_unknown` | MaiWeave 是否使用配套适配包，接口是否返回完整状态 |
+| `state_unknown` | MaiWeave 的公开状态接口是否可用，是否返回完整的活动、实际睡眠和查询时间 |
 | `life_state_stale` | 查询时间是否过期，宿主与插件的系统时间是否一致 |
 | `life_boundary_changed` | 查询期间活动或唤醒期限已变化，下一次动作会重新查询 |
 | `LIFE_PROVIDER_MISSING`、超时 | MaiWeave 是否加载成功；其他必要插件是否正常 |

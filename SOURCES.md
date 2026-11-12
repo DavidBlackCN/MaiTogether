@@ -16,7 +16,7 @@
 - [Cateye 消息后处理 1.4.5，Host 1.4 分支](https://github.com/cateyemizuki/cateye_better_post-processing/tree/18652c37dba6fc0340a393daaf636faa901fb3a3)。
 - [智能分段 1.1.0](https://github.com/HaoxiangXia/smart_segmentation_plugin/tree/db9dd69cc37856841aa60a2724e3181cfe65b65e)。
 
-[MaiWeave 0.11.4](https://github.com/ilworkcn/MaiWeave/tree/e569331ebbb30a24da340ca94687506c1b20e704) 使用上游 GPL-3.0-only 许可证；配套交付与资料范围补丁沿用该许可证，维护于 [integrations/maiweave](integrations/maiweave/README.md)。生活引擎的选用和配置见 [MaiWeave](docs/plugins/maiweave.md)。
+[MaiWeave 0.11.4](https://github.com/ilworkcn/MaiWeave/tree/e569331ebbb30a24da340ca94687506c1b20e704) 使用上游原版源码及 GPL-3.0-only 许可证；接口与测试记录见 [integrations/maiweave](integrations/maiweave/README.md)。生活引擎的选用和配置见 [MaiWeave](docs/plugins/maiweave.md)。
 
 其他插件的来源见[插件清单](docs/plugins.md)，各自保留原作者和许可证。
 

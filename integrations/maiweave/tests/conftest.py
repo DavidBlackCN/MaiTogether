@@ -1,4 +1,4 @@
-"""使用组装后的原始插件领域代码；所有外部服务为替身。"""
+"""直接加载上游原版；所有外部服务为替身。"""
 import importlib.util
 import os
 from pathlib import Path

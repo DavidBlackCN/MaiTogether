@@ -42,7 +42,7 @@ python integrations/maiwork/tests/run.py --source ../MaiWork-adapted --output ..
 原生组合测试还需要已审查 MaiWeave、组装 Host、连接器及工作区参测插件：
 
 ```bash
-python tools/run_native.py --workspace .. --host ../control-build/host --adapter ../control-build/adapter --maiweave ../MaiWeave-adapted --maiwork ../MaiWork-adapted --output ../maiwork-native-results
+python tools/run_native.py --workspace .. --host ../control-build/host --adapter ../control-build/adapter --maiweave ../MaiWeave --maiwork ../MaiWork-adapted --output ../maiwork-native-results
 ```
 
 外部模型与 QQ 使用本地替身。真实账号、Debian 执行隔离和长期运行需单独验证。升级先检查上游差异、重建并测试，再更新版本记录；不能直接用上游源码覆盖适配包。

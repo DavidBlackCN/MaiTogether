@@ -96,7 +96,10 @@ async def run(work):
         configs['maiweave'] = {'plugin': {'enabled': True, 'config_version': '0.11.4'},
             'life': {'enabled': True, 'autonomous': False, 'model_task': 'test'},
             'world': {'weather_enabled': False, 'news_enabled': False, 'search_enabled': False, 'places_enabled': False},
-            'proactive': {'enabled': False}, 'memory': {'enabled': False}}
+            'proactive': {'enabled': False}, 'memory': {'enabled': False},
+            'context': {'people': False}}
+        if os.environ.get('MAIWEAVE_SMOKE') == '1':
+            configs['maiweave']['life']['schedule_enabled'] = False
         if 'maiwork' in configs: configs['maiwork']['together']['life_provider'] = 'maiweave'
     if os.environ.get('POST_PROCESSING_TEST') == '1':
         configs['post_processing'] = {'plugin': {'enabled': True, 'config_version': '1.4.5'},
@@ -180,7 +183,10 @@ async def run(work):
     try:
         await supervisor.start()
         if weave:
-            from weave_native import run_cases
+            if os.environ.get('MAIWEAVE_SMOKE') == '1':
+                from weave_smoke import run_cases
+            else:
+                from weave_native import run_cases
             await run_cases(locals())
             return
         assert {LIFE,HUSH,IDENTITY,ADAPTER,POKE,CATEYE,PROBE} <= set(supervisor._registered_plugins),supervisor._registered_plugins

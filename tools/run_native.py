@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CONTROL = Path(__file__).resolve().parents[1]
 
 
-def stage(work, adapter_source, workspace, pins, maiweave=None, post_processing=None, segmentation=None, smart_poke=None):
+def stage(work, adapter_source, workspace, pins, maiweave=None, post_processing=None, segmentation=None, smart_poke=None, weave_smoke=False):
     sources = {name: workspace / name for name in ('maibot-maihush-plugin', 'maibot-maiIdentity-plugin')}
     sources.update(adapter=adapter_source,
                    poke=smart_poke or workspace / '.implementation/vendor/smart_poke_plugin',
@@ -55,7 +55,7 @@ def stage(work, adapter_source, workspace, pins, maiweave=None, post_processing=
         manifest = json.loads((probe / '_manifest.json').read_text(encoding='utf-8'))
         manifest.update(id='test.life-provider', name='Synthetic life state', capabilities=[])
         (fixture / '_manifest.json').write_text(json.dumps(manifest), encoding='utf-8')
-    if maiweave:
+    if maiweave and not weave_smoke:
         target = work/'plugins/maiweave'
         shutil.copyfile(CONTROL/'tests/weave_probe.py', target/'acceptance_probe.py')
         entry=target/'plugin.py'
@@ -83,11 +83,14 @@ def main():
     parser.add_argument('--native-chat',action='store_true',help='Official reception and memory continue while outbound sleep control remains active')
     parser.add_argument('--life-provider',action='store_true',help='Generic Life Provider and unavailable-backend acceptance')
     parser.add_argument('--maiwork',type=Path,help='Assembled MaiWork adaptation for isolated acceptance')
-    parser.add_argument('--maiweave',type=Path,help='Assembled MaiWeave adaptation; Vita and Coordinate are not installed')
+    parser.add_argument('--maiweave',type=Path,help='Clean reviewed upstream MaiWeave source')
+    parser.add_argument('--maiweave-smoke',action='store_true',help='Load original MaiWeave without test entry injection')
     parser.add_argument('--post-processing',type=Path,help='Cateye Host 1.4 branch source')
     parser.add_argument('--segmentation',type=Path,help='Smart segmentation source')
     parser.add_argument('--smart-poke',type=Path,help='Optional newer Smart Poke source for compatibility checks')
     args = parser.parse_args()
+    if args.maiweave_smoke and not args.maiweave:
+        parser.error('--maiweave-smoke requires --maiweave')
     if bool(args.post_processing) != bool(args.segmentation):
         parser.error('Post-processing acceptance requires both source directories')
     if args.maiwork and not args.maiweave:
@@ -95,7 +98,7 @@ def main():
     weave_pin = None
     if args.maiweave:
         weave_pin=json.loads((CONTROL/'integrations/maiweave/baseline.json').read_text(encoding='utf-8'))
-        spec=importlib.util.spec_from_file_location('weave_build',CONTROL/'integrations/maiweave/build.py')
+        spec=importlib.util.spec_from_file_location('weave_source',CONTROL/'integrations/maiweave/source.py')
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
         module.verify(args.maiweave.resolve())
     pins_path = args.host.resolve().parent / 'baseline.json'
@@ -108,7 +111,7 @@ def main():
     work.mkdir(parents=True, exist_ok=False)
     if args.maiweave and any((args.life_provider,args.native_chat,args.community)):
         parser.error('--maiweave selects its own acceptance scenario')
-    stage(work,args.adapter.resolve(),args.workspace.resolve(),pins,args.maiweave,args.post_processing,args.segmentation,args.smart_poke)
+    stage(work,args.adapter.resolve(),args.workspace.resolve(),pins,args.maiweave,args.post_processing,args.segmentation,args.smart_poke,args.maiweave_smoke)
     if args.maiwork:
         spec=importlib.util.spec_from_file_location('work_build',CONTROL/'integrations/maiwork/build.py')
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
@@ -141,6 +144,8 @@ def main():
         MAIBOT_LIFE_TEST=str(int(args.life_provider)),
         MAIWORK_TEST=str(int(bool(args.maiwork))),
         MAIWEAVE_TEST=str(int(bool(args.maiweave))),
+        MAIWEAVE_SMOKE=str(int(args.maiweave_smoke)),
+        MAIWEAVE_ORIGINAL_SOURCE=str(args.maiweave.resolve()) if args.maiweave else '',
         POST_PROCESSING_TEST=str(int(bool(args.post_processing))),
         MAIBOT_WEBUI_USE_LOCAL_DASHBOARD='1',
         MAIBOT_BEHAVIOR_CONFIG=str(work / 'behavior.json'), TEMP=str(work), TMP=str(work), USERPROFILE=str(work))
@@ -164,6 +169,7 @@ def main():
             'passed':True,'kind':'maiweave' if args.maiweave else 'life-provider' if args.life_provider else 'maiwork' if args.maiwork else 'community' if args.community else 'native-chat' if args.native_chat else 'behavior',
             'baseline':pins,'cases':result['cases'],
             'maiweave':weave_pin,
+            'maiweave_test_entry': bool(args.maiweave and not args.maiweave_smoke),
             'sources_sha256':hashlib.sha256((work/'sources.json').read_bytes()).hexdigest(),
         },indent=2),encoding='utf-8')
         print(json.dumps({'passed':len(result['cases']),'writes':result['writes'],'evidence':str(work)},ensure_ascii=False))

@@ -1,4 +1,4 @@
-"""Run the adaptation and affected upstream tests without external connections."""
+"""Run original upstream contract and sharing tests without external connections."""
 from pathlib import Path
 import argparse
 import importlib.util
@@ -12,7 +12,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     source, output = args.source.resolve(), args.output.resolve()
-    spec = importlib.util.spec_from_file_location('weave_build', Path(__file__).parents[1] / 'build.py')
+    spec = importlib.util.spec_from_file_location('weave_source', Path(__file__).parents[1] / 'source.py')
     build = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(build)
     build.verify(source)
@@ -27,9 +27,10 @@ def main():
     sys.path.insert(0, str(Path(__file__).parent))
     import pytest
     names = ('test_life_status.py', 'test_nap_quiet.py', 'test_sleep_policy.py',
-             'test_webui.py', 'test_reading_rhythm.py')
-    return pytest.main([str(Path(__file__).with_name('test_integration.py')),
-        *[str(source / 'tests' / name) for name in names], '-q', '-p', 'upstream_fixture',
+             'test_webui.py', 'test_reading_rhythm.py', 'test_qzone.py',
+             'test_proactive_modes.py', 'test_proactive_followup.py', 'test_plugin.py')
+    return pytest.main([str(Path(__file__).with_name('test_source.py')),
+        *[str(source / 'tests' / name) for name in names], '-q',
         '-p', 'no:cacheprovider', '-o', 'asyncio_mode=auto',
         '-o', 'asyncio_default_fixture_loop_scope=function',
         '--basetemp=' + str(output / 'tmp'), '--junitxml=' + str(output / 'results.xml')])

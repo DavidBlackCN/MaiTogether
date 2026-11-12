@@ -56,13 +56,10 @@ class AcceptanceProbe:
 
     @API('acceptance_delivery', public=False, version='1')
     async def acceptance_delivery(self, mode='space', stream_id='', suffix='one'):
-        from .integrations.together import deliver, DeliveryProblem
-        from .integrations.qzone import DiaryPublisher
         try:
             if mode == 'message':
-                return await deliver(self.ctx, 'message', {'stream_id': stream_id,
-                    'segments': [{'type': 'text', 'content': 'isolated life sharing'}],
-                    'storage_message': True, 'sync_to_maisaka_history': True})
+                return await self.ctx.send.text('isolated life sharing', stream_id,
+                    return_details=True, storage_message=True, sync_to_maisaka_history=True)
             day = 'fixture-' + suffix
             self.config.diary.publish_mode = '手动发布'
             pub = self.diary_publisher
@@ -70,13 +67,12 @@ class AcceptanceProbe:
                 pub.put({'id': day, 'day': day, 'status': '草稿', 'content': 'isolated public diary'})
             await pub.publish(day, self.now())
             return self.store.get('diary_publication', day)
-        except DeliveryProblem as error:
-            return {'state': error.state, 'status': self.store.get('diary_publication', day)['status'] if mode == 'space' else '', 'error': str(error)}
+        except Exception as error:
+            return {'status': self.store.get('diary_publication', day)['status'] if mode == 'space' else '', 'error': str(error)}
 
     @API('acceptance_share', public=False, version='1')
     async def acceptance_share(self, stream_id):
         from .core.models import ExperienceInput
-        from .integrations.together import DeliveryProblem
         now = self.now()
         cfg = self.config.proactive
         cfg.enabled, cfg.mode, cfg.session_ids = True, '主动表达', [stream_id]
@@ -86,7 +82,7 @@ class AcceptanceProbe:
             occurred_at=now.isoformat(), source='simulated', evidence='fixture'), stream_id, now)
         try:
             await self.living.share(now)
-        except DeliveryProblem:
+        except RuntimeError:
             pass
         finally:
             cfg.enabled = False

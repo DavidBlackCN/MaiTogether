@@ -2161,7 +2161,7 @@
   "src/plugin_runtime/behavior_policy/__init__.py": "8e84ffc309ff87f671e791cc7070558316d4ae22e8a76e6d10de0d21617068c9",
   "src/plugin_runtime/behavior_policy/actions.py": "53389c4b45ccbdae6241572ab0164d0964b420ab0ecb37a36bce42a2544471d0",
   "src/plugin_runtime/behavior_policy/context.py": "a8bcec7661302708f4d0a23202bf302bc1db26d4f43df70400b98c11260615cd",
-  "src/plugin_runtime/behavior_policy/delivery.py": "53a7c1239de0d75556ddd3d223b0867d6f909d38b729869f4de3175a718ca805",
+  "src/plugin_runtime/behavior_policy/delivery.py": "ef5326ff1d9c9e2b7d9a25f94246b60c472001ba1f7cc3ea452f7593ae7806d2",
   "src/plugin_runtime/behavior_policy/life.py": "a9b894b75ffab267d52b0e8cefb2d3f6ca26e29c571152e7862c9affec2b8ae8",
   "src/plugin_runtime/behavior_policy/life_status.py": "99506f302c4d23bffd4190b61960c0c320fe6a35a9d144d7c98ad23806e4ab5b",
   "src/plugin_runtime/behavior_policy/platform.py": "4ac7a8551890a5b7035478a8199d86255174f616b1cd6e72c487bf768732faf7",
