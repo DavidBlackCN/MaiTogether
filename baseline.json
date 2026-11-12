@@ -1,14 +1,14 @@
 {
-  "adaptation_version": "0.6.0",
+  "adaptation_version": "0.6.1",
   "contract_version": 1,
   "host": {
-    "commit": "8e18e306436101cf890cecff489f59675f48baea",
-    "tag": "v1.4.2",
+    "commit": "e5391507531706a8bfce011d55ed94628039f2de",
+    "tag": "v1.4.3",
     "repository": "https://github.com/Mai-with-u/MaiBot"
   },
   "sdk": {
-    "commit": "aa9ab7b347f9d011a3e0b00addee46de8f16bf9e",
-    "tag": "v2.21.0",
+    "commit": "da075f56c9758d98d07b02c123aefbbcc2f7ddd5",
+    "tag": "v2.22.1",
     "repository": "https://github.com/Mai-with-u/maibot-plugin-sdk"
   },
   "adapter": {

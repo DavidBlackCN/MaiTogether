@@ -18,7 +18,7 @@ python3 tools/prepare.py --host ../MaiBot --output ../MaiTogether-ready --apply
 
 把 `../MaiBot` 改成已有的主程序源码路径，输出目录须是一个新目录。需要 Git 和 Python 3.11 以上版本；运行 MaiBot 使用它原有的 Python 环境。
 
-命令会检查主程序版本，下载并制作配套 QQ 连接器，再备份和修改 Host 源码。**当前适用 MaiBot 1.4.2**；版本不同或源码已有修改时会停止，不会自动降级、重置源码或改动数据库。
+命令会检查主程序版本，下载并制作配套 QQ 连接器，再备份和修改 Host 源码。**当前适用 MaiBot 1.4.3**；版本不同或源码已有修改时会停止，不会自动降级、重置源码或改动数据库。
 
 将输出的 `adapter/` 安装到所选 Bot 实例的 `plugins/` 中：
 

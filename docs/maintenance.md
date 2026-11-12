@@ -2,7 +2,7 @@
 
 普通安装见[安装与设置](setup.md)。本页供维护者更新补丁、构建和测试。
 
-当前配套使用 Host 1.4.2、SDK 2.21.0、QQ 连接器 1.1.13，MaiTogether 修改版本为 0.6.0。准确提交见 [baseline.json](../baseline.json)。
+当前配套使用 Host 1.4.3、SDK 2.22.1、QQ 连接器 1.1.13，MaiTogether 修改版本为 0.6.0。准确提交见 [baseline.json](../baseline.json)。
 
 ## 目录
 
@@ -25,7 +25,7 @@
 python tools/build.py --host-source ../upstream/MaiBot --adapter-source ../upstream/MaiBot-SnowLuma-Adapter --output ../control-build
 ```
 
-输出目录必须不存在，包含完整 `host/`、`adapter/` 和版本记录。工具从固定 Git 提交读取源码、应用补丁并核对文件，不使用上游目录里未提交的改动。运行 Host 1.4.2 需要 Python 3.12 以上版本及其依赖。
+输出目录必须不存在，包含完整 `host/`、`adapter/` 和版本记录。工具从固定 Git 提交读取源码、应用补丁并核对文件，不使用上游目录里未提交的改动。运行 Host 1.4.3 需要 Python 3.12 以上版本及其依赖。
 
 安装准备工具也支持离线源码：
 
@@ -45,11 +45,13 @@ python tools/validate.py --candidate ../upgrade-candidate --workspace ..
 python tools/upgrade.py promote --candidate ../upgrade-candidate
 ```
 
-- `check` 查询最新正式版，记录提交，列出受影响文件并尝试构建，输出在候选目录的 `build/`。
+- `check` 查询最新正式 Host／SDK，并选择声明支持它们的正式连接器版本，记录提交、列出受影响文件并尝试构建，输出在候选目录的 `build/`。
 - 检查上游接口变化后运行 `validate`，不能只以补丁能应用为通过。
 - `promote` 要求回归通过、源码与结果一致，并再次核对正式版，然后更新版本记录和两份校验清单，不部署运行实例。
 
 有冲突时只修改对应补丁或新增模块。不要为追赶新版本复制一套官方业务代码。维护源码改变后，应重新建立候选目录。
+
+当前连接器 1.3.1 要求尚未正式发布的 Host 1.4.4；1.1.13 的官方安装声明又停在 Host 1.3.x。配套修改版已将 1.1.13 的支持上限更新到经过验证的 Host 1.4.3。本次维护检查在 `check` 命令末尾增加 `--adapter-tag v1.1.13`，仍必须通过组装后的版本检查和完整回归；普通用户的安装命令不变。新 Host 正式发布后重新评估连接器，不沿用这一选择。
 
 ## 回归环境
 

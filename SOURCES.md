@@ -4,8 +4,8 @@
 
 | 项目 | 版本 | 本项目的处理 |
 | --- | --- | --- |
-| [MaiBot](https://github.com/Mai-with-u/MaiBot) | 1.4.2 | 保存真实调用来源，检查对外动作的生活状态、静音和权限 |
-| [Plugin SDK](https://github.com/Mai-with-u/maibot-plugin-sdk) | 2.21.0 | 使用原版，没有修改 |
+| [MaiBot](https://github.com/Mai-with-u/MaiBot) | 1.4.3 | 保存真实调用来源，检查对外动作的生活状态、静音和权限 |
+| [Plugin SDK](https://github.com/Mai-with-u/maibot-plugin-sdk) | 2.22.1 | 使用原版，没有修改 |
 | [QQ 连接器](https://github.com/Mai-with-u/MaiBot-SnowLuma-Adapter) | 1.1.13 | 在实际发送前再次检查状态，分别处理批量动作的结果 |
 
 社区插件回归使用以下原版源码：

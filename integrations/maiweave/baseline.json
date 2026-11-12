@@ -11,10 +11,10 @@
     "queried_at"
   ],
   "verified_with": {
-    "host": "1.4.2",
-    "sdk": "2.21.0",
+    "host": "1.4.3",
+    "sdk": "2.22.1",
     "mode": "isolated"
   },
   "production_ready": false,
-  "adaptation": "1.0.0"
+  "adaptation": "1.0.1"
 }

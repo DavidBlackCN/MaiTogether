@@ -46,6 +46,8 @@ def main():
     commands.append(('adapter', [sys.executable, str(CONTROL / 'tools/test_adapter.py'),
                                 '--adapter', str(build / 'adapter'), '--temp', str(evidence / 'adapter-pytest')]))
     if args.maiweave:
+        commands.append(('maiweave-unit', [sys.executable, str(CONTROL / 'integrations/maiweave/tests/run.py'),
+            '--source', str(args.maiweave.resolve()), '--output', str(evidence / 'maiweave-unit')]))
         command = [sys.executable, str(CONTROL / 'tools/run_native.py'), '--workspace', str(args.workspace.resolve()),
             '--host', str(build / 'host'), '--adapter', str(build / 'adapter'),
             '--maiweave', str(args.maiweave.resolve()), '--output', str(evidence / 'weave')]
