@@ -9,18 +9,21 @@ import subprocess
 import sys
 import time
 import importlib.metadata
+import importlib.util
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTROL = Path(__file__).resolve().parents[1]
 
 
-def stage(work, adapter_source, workspace, pins, maiweave=None):
+def stage(work, adapter_source, workspace, pins, maiweave=None, post_processing=None, segmentation=None, smart_poke=None):
     sources = {name: workspace / name for name in ('maibot-maihush-plugin', 'maibot-maiIdentity-plugin')}
     sources.update(adapter=adapter_source,
-                   poke=workspace / '.implementation/vendor/smart_poke_plugin',
+                   poke=smart_poke or workspace / '.implementation/vendor/smart_poke_plugin',
                    cateye=workspace / '.implementation/vendor/Cateye-audit')
     if maiweave:
         sources['maiweave'] = maiweave
+    if post_processing:
+        sources.update(post_processing=post_processing, segmentation=segmentation)
     evidence = {}
     for name, source in sources.items():
         target = work / 'plugins' / name
@@ -80,17 +83,21 @@ def main():
     parser.add_argument('--native-chat',action='store_true',help='Official reception and memory continue while outbound sleep control remains active')
     parser.add_argument('--life-provider',action='store_true',help='Generic Life Provider and unavailable-backend acceptance')
     parser.add_argument('--maiwork',type=Path,help='Assembled MaiWork adaptation for isolated acceptance')
-    parser.add_argument('--maiweave',type=Path,help='Latest reviewed MaiWeave source; Vita and Coordinate are not installed')
+    parser.add_argument('--maiweave',type=Path,help='Assembled MaiWeave adaptation; Vita and Coordinate are not installed')
+    parser.add_argument('--post-processing',type=Path,help='Cateye Host 1.4 branch source')
+    parser.add_argument('--segmentation',type=Path,help='Smart segmentation source')
+    parser.add_argument('--smart-poke',type=Path,help='Optional newer Smart Poke source for compatibility checks')
     args = parser.parse_args()
+    if bool(args.post_processing) != bool(args.segmentation):
+        parser.error('Post-processing acceptance requires both source directories')
     if args.maiwork and not args.maiweave:
         parser.error("--maiwork requires --maiweave; the Vita matrix is retired")
     weave_pin = None
     if args.maiweave:
         weave_pin=json.loads((CONTROL/'integrations/maiweave/baseline.json').read_text(encoding='utf-8'))
-        git=['git','-c','safe.directory='+args.maiweave.resolve().as_posix(),'-C',str(args.maiweave)]
-        actual=subprocess.check_output([*git,'rev-parse','HEAD']).decode().strip()
-        if actual != weave_pin['commit'] or subprocess.check_output([*git,'status','--porcelain']).strip():
-            raise ValueError('Review latest MaiWeave source and update its baseline before acceptance; source must be clean')
+        spec=importlib.util.spec_from_file_location('weave_build',CONTROL/'integrations/maiweave/build.py')
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        module.verify(args.maiweave.resolve())
     pins_path = args.host.resolve().parent / 'baseline.json'
     if not pins_path.exists():
         pins_path = CONTROL / 'baseline.json'
@@ -101,8 +108,11 @@ def main():
     work.mkdir(parents=True, exist_ok=False)
     if args.maiweave and any((args.life_provider,args.native_chat,args.community)):
         parser.error('--maiweave selects its own acceptance scenario')
-    stage(work,args.adapter.resolve(),args.workspace.resolve(),pins,args.maiweave)
+    stage(work,args.adapter.resolve(),args.workspace.resolve(),pins,args.maiweave,args.post_processing,args.segmentation,args.smart_poke)
     if args.maiwork:
+        spec=importlib.util.spec_from_file_location('work_build',CONTROL/'integrations/maiwork/build.py')
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        module.verify(args.maiwork.resolve())
         shutil.copytree(args.maiwork, work/'plugins/maiwork', ignore=shutil.ignore_patterns(
             '.git','__pycache__','tests','docs','config.toml'))
         shutil.copyfile(CONTROL/'integrations/maiwork/tests/native_probe.py', work/'plugins/maiwork/native_probe.py')
@@ -131,6 +141,7 @@ def main():
         MAIBOT_LIFE_TEST=str(int(args.life_provider)),
         MAIWORK_TEST=str(int(bool(args.maiwork))),
         MAIWEAVE_TEST=str(int(bool(args.maiweave))),
+        POST_PROCESSING_TEST=str(int(bool(args.post_processing))),
         MAIBOT_WEBUI_USE_LOCAL_DASHBOARD='1',
         MAIBOT_BEHAVIOR_CONFIG=str(work / 'behavior.json'), TEMP=str(work), TMP=str(work), USERPROFILE=str(work))
     with (work / 'console.log').open('wb') as log:

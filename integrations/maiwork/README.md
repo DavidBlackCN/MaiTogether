@@ -4,12 +4,12 @@
 
 | 项目 | 记录 |
 | --- | --- |
-| MaiWork | 0.15.3 |
-| 适配版本 | 1.1.0 |
-| 完整组合 Host / SDK | 1.3.19 / 2.21.0 |
+| MaiWork | 0.17.0 |
+| 适配版本 | 1.2.0 |
+| 完整组合 Host / SDK | 1.4.2 / 2.21.0 |
 | QQ 连接器 | 1.1.13 配套修改版 |
 
-准确提交见 [baseline.json](baseline.json)。当前 MaiTogether 已使用 Host 1.4.2，MaiWork 完整组合仍需升级验证；共享生活状态模块的单元测试不能代替它。
+准确提交见 [baseline.json](baseline.json)。真实账号、执行环境和长期运行仍需在部署环境验收。
 
 ## 构建
 
@@ -42,7 +42,7 @@ python integrations/maiwork/tests/run.py --source ../MaiWork-adapted --output ..
 原生组合测试还需要已审查 MaiWeave、组装 Host、连接器及工作区参测插件：
 
 ```bash
-python tools/run_native.py --workspace .. --host ../control-build/host --adapter ../control-build/adapter --maiweave ../MaiWeave --maiwork ../MaiWork-adapted --output ../maiwork-native-results
+python tools/run_native.py --workspace .. --host ../control-build/host --adapter ../control-build/adapter --maiweave ../MaiWeave-adapted --maiwork ../MaiWork-adapted --output ../maiwork-native-results
 ```
 
 外部模型与 QQ 使用本地替身。真实账号、Debian 执行隔离和长期运行需单独验证。升级先检查上游差异、重建并测试，再更新版本记录；不能直接用上游源码覆盖适配包。

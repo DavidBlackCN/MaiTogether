@@ -17,7 +17,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--candidate', type=Path, required=True)
     parser.add_argument('--workspace', type=Path, required=True)
-    parser.add_argument('--maiweave', type=Path, help='Reviewed latest source for MaiWeave acceptance')
+    parser.add_argument('--maiweave', type=Path, help='Assembled MaiWeave adaptation for acceptance')
     parser.add_argument('--maiwork', type=Path, help='Built adaptation; enables work unit and native tests')
     args = parser.parse_args()
     if args.maiwork and not args.maiweave:

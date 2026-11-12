@@ -20,15 +20,19 @@ def app_for(host, raw=None):
 
 
 def life(available=True):
-    return {'api_version':1,'ok':True,'data':{'available':available,'sleep_phase':'awake' if available else 'sleeping',
-        'snapshot_valid_until':(datetime.now(timezone.utc)+timedelta(seconds=5)).isoformat()}}
+    now = datetime.now(timezone.utc)
+    return {'version':1,'ready':True,'enabled':True,'schedule_enabled':True,
+        'updated_at':now.isoformat(),'queried_at':now.isoformat(),'sleeping':False,
+        'effective_sleeping':not available,'sleep_until':None if available else (now+timedelta(minutes=10)).isoformat(),
+        'awake_until':None,'current':None,'next_plan':None}
 
 
 @pytest.mark.asyncio
 async def test_weave_admission_without_vita_and_without_send_permission():
     now=datetime.now(timezone.utc)
     state={'version':1,'ready':True,'enabled':True,'schedule_enabled':False,
-        'updated_at':now.isoformat(),'sleeping':False,'awake_until':None,'current':None}
+        'updated_at':now.isoformat(),'queried_at':now.isoformat(),'sleeping':False,
+        'effective_sleeping':False,'sleep_until':None,'awake_until':None,'current':None,'next_plan':None}
     host=SimpleNamespace(_call=AsyncMock(return_value=state))
     app=app_for(host,{'groups':{'serve':[{'group':'qq:'+GID}]},'together':{'life_provider':'maiweave'}})
     assert await app.together.available(GID)
@@ -38,8 +42,12 @@ async def test_weave_admission_without_vita_and_without_send_permission():
     host._call.reset_mock()
     assert not await app.together.available('outside')
     host._call.assert_not_called()
+    host._call.return_value={**state,'schedule_enabled':True,'updated_at':(now-timedelta(days=1)).isoformat()}
+    assert await app.together.available(GID)
     for changes in ({'ready':False},{'enabled':False},{'version':2},
-                    {'schedule_enabled':True},{'updated_at':(now-timedelta(minutes=10)).isoformat()}):
+                    {'effective_sleeping':None},
+                    {'schedule_enabled':True,'effective_sleeping':True,'sleep_until':(now+timedelta(minutes=10)).isoformat()},
+                    {'queried_at':(now-timedelta(minutes=10)).isoformat()}):
         host._call.return_value={**state,**changes}
         assert not await app.together.available(GID)
     host._call.return_value={**state,'current':{'id':'work','kind':'work','status':'active',

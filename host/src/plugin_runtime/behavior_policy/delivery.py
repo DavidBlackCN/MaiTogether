@@ -34,6 +34,18 @@ def register(manager, supervisor):
                 raise ValueError('DELIVERY_FILE_ARGUMENTS_INVALID')
             call_args = dict(api_name='adapter.napcat.file.upload_group_file', version='1', args={'params': args})
             impl = manager._cap_api_call
+        elif operation == 'space':
+            required = 'api.call'
+            if (set(args) != {'account_id', 'content', 'ugc_right'}
+                    or not isinstance(args['content'], str) or not args['content'].strip()
+                    or type(args['ugc_right']) is not int or args['ugc_right'] not in (1, 4, 64)):
+                raise ValueError('DELIVERY_SPACE_ARGUMENTS_INVALID')
+            state = get_policy()._qq_contract()
+            if state is None or args['account_id'] != state.account_id:
+                raise PermissionError('BEHAVIOR_SPACE_ACCOUNT_MISMATCH')
+            call_args = dict(api_name='adapter.snowluma.qzone.send_qzone_msg', version='1',
+                             args={'params': {k: args[k] for k in ('content', 'ugc_right')}})
+            impl = manager._cap_api_call
         else:
             raise ValueError('DELIVERY_OPERATION_INVALID')
         allowed, reason = supervisor.capability_service._authorization.check_capability(plugin, required)
@@ -52,10 +64,10 @@ def register(manager, supervisor):
             except Exception as exc:
                 raw = {'success': False, 'error': str(exc)[:240]}
             raw = raw if isinstance(raw, dict) else {}
-            result = raw.get('result', raw) if operation == 'file' else raw
+            result = raw.get('result', raw) if operation in ('file', 'space') else raw
             result = result if isinstance(result, dict) else {}
             ok = (result.get('status') == 'ok' and result.get('retcode', 0) == 0
-                  if operation == 'file' else raw.get('sent') is True)
+                  if operation in ('file', 'space') else raw.get('sent') is True)
             state = send_outcome(ok)
             # No final gate evidence is not a delivery confirmation.
             if state == 'confirmed' and not current.get().results:
@@ -68,7 +80,8 @@ def register(manager, supervisor):
                 state = 'deferred' if 'denied' in states or not reason or 'BEHAVIOR_' in reason else 'failed'
             data = result.get('data') or {}
             return {'version': 1, 'state': state, 'sent': state == 'confirmed',
-                    'message_id': raw.get('message_id'), 'file_id': data.get('file_id'), 'reason': reason}
+                    'message_id': raw.get('message_id'), 'file_id': data.get('file_id'),
+                    'post_id': data.get('tid'), 'reason': reason}
         finally:
             current.reset(token)
 

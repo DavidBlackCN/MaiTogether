@@ -11,13 +11,16 @@
 社区插件回归使用以下原版源码：
 
 - [Smart Poke 1.11.1](https://github.com/TAIY2020/smart_poke_plugin/tree/59ff292b4d912a5cbe5d09cce32381e8497d350f)。
+- [Smart Poke 1.13.0](https://github.com/TAIY2020/smart_poke_plugin/tree/df29e929bde938789360569a27fb1171f40325cd)。
 - [Cateye 表情回应 0.3.2](https://github.com/cateyemizuki/cateye_set_msg_emoji_like_api_modify/tree/f239878a3eb217fa4730fb9569c2277de4beaa01)。
+- [Cateye 消息后处理 1.4.5，Host 1.4 分支](https://github.com/cateyemizuki/cateye_better_post-processing/tree/18652c37dba6fc0340a393daaf636faa901fb3a3)。
+- [智能分段 1.1.0](https://github.com/HaoxiangXia/smart_segmentation_plugin/tree/db9dd69cc37856841aa60a2724e3181cfe65b65e)。
 
-[MaiWeave 0.9.0 接口参考源码](https://github.com/ilworkcn/MaiWeave/tree/70976f517c051a8b341f81aca3dfffbc1e1990e7) 使用上游 GPL-3.0-only 许可证。接入使用公开只读 API，记录见 [integrations/maiweave/baseline.json](integrations/maiweave/baseline.json)。Host 状态回归使用隔离测试插件；生活引擎的选用和限制见 [MaiWeave](docs/plugins/maiweave.md)。
+[MaiWeave 0.11.4](https://github.com/ilworkcn/MaiWeave/tree/e569331ebbb30a24da340ca94687506c1b20e704) 使用上游 GPL-3.0-only 许可证；配套交付与资料范围补丁沿用该许可证，维护于 [integrations/maiweave](integrations/maiweave/README.md)。生活引擎的选用和配置见 [MaiWeave](docs/plugins/maiweave.md)。
 
 其他插件的来源见[插件清单](docs/plugins.md)，各自保留原作者和许可证。
 
-[MaiWork 0.15.3](https://github.com/CharTyr/MaiWork/tree/ed29864de132622f04c34846ad97ecdf3f9ba0d8) 的配套适配位于 [integrations/maiwork](integrations/maiwork/README.md)。构建保留上游 AGPL-3.0-or-later 许可证、插件 ID 和作者信息；MaiWork 适配补丁与新增模块也按 AGPL-3.0-or-later 提供。
+[MaiWork 0.17.0](https://github.com/CharTyr/MaiWork/tree/e375b5306942c9fab6b974228deaf20cc11ca433) 的配套适配位于 [integrations/maiwork](integrations/maiwork/README.md)。构建保留上游 AGPL-3.0-or-later 许可证、插件 ID 和作者信息；MaiWork 适配补丁与新增模块也按 AGPL-3.0-or-later 提供。
 
 ## 许可证
 
@@ -25,4 +28,4 @@ Host 上游附 GPL 第 3 版许可证，原文保存在 [licenses/Host-LICENSE](
 
 QQ 连接器的固定提交没有单独的 LICENSE 文件，其 Manifest 声明为 GPL-v3.0-or-later。本项目保留原 Manifest 和作者信息，并附上 [GPL 第 3 版全文](licenses/GPL-3.0.txt)。
 
-本项目新增的补丁和模块以 **GPL-3.0-or-later** 提供，不改变上游文件的作者和权利归属。
+Host／连接器新增的补丁和模块以 **GPL-3.0-or-later** 提供；社区插件适配按上述各自许可证提供，不改变上游文件的作者和权利归属。

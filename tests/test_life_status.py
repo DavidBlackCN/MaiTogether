@@ -11,15 +11,17 @@ def iso(offset=0):
     return datetime.fromtimestamp(NOW+offset, timezone.utc).isoformat()
 
 def status(kind='leisure', **values):
+    effective = kind == 'sleep' and values.get('schedule_enabled', True) and not values.get('awake_until')
     return {'version': 1, 'ready': True, 'enabled': True, 'schedule_enabled': True,
-        'updated_at': iso(), 'sleeping': kind == 'sleep', 'awake_until': None,
+        'updated_at': iso(), 'queried_at': iso(), 'sleeping': kind == 'sleep', 'awake_until': None,
+        'effective_sleeping': effective, 'sleep_until': iso(60) if effective else None, 'next_plan': None,
         'current': {'id': 'activity', 'kind': kind, 'status': 'scheduled',
                     'start': iso(-60), 'end': iso(60)} if kind else None, **values}
 
 @pytest.mark.parametrize('kind,category,reason', [
     ('leisure','social','available'), ('sleep','social','sleeping'),
     ('work','social','busy'), ('study','work','busy'), ('travel','social','busy'),
-    ('work','work','busy'), (None,'social','sleep_state_ambiguous'),
+    ('work','work','busy'), (None,'social','available'),
 ])
 def test_activity_rules(kind, category, reason):
     value=status(kind); original=deepcopy(value)
@@ -35,8 +37,22 @@ def test_activity_rules(kind, category, reason):
     (status(None, schedule_enabled=False), 'available'),
     (status('sleep', schedule_enabled=False), 'available'),
     (status(enabled=False), 'life_disabled'), (status(ready=False), 'not_ready'),
-    (status(updated_at=iso(-181)), 'life_state_stale'),
-    (status(updated_at=iso(6)), 'life_state_stale'),
+    (status(updated_at=iso(-86400)), 'available'),
+    (status(queried_at=iso(-181)), 'life_state_stale'),
+    (status(queried_at=iso(6)), 'life_state_stale'),
+    (status(updated_at=iso(6)), 'state_unknown'),
+    (status(None, effective_sleeping=True, sleep_until=iso(60)), 'sleeping'),
+    (status(None, effective_sleeping=True, sleep_until=iso()), 'life_boundary_changed'),
+    (status(None, effective_sleeping=True), 'state_unknown'),
+    (status(effective_sleeping=True, sleep_until=iso(60)), 'state_unknown'),
+    (status(sleep_until=iso(60)), 'state_unknown'),
+    (status('sleep', effective_sleeping=False, sleep_until=None), 'state_unknown'),
+    (status('sleep', quiet=False), 'sleeping'),
+    (status(None, awake_until=iso(60), effective_sleeping=True, sleep_until=iso(60)), 'state_unknown'),
+    (status(None, schedule_enabled=False, effective_sleeping=True, sleep_until=iso(60)), 'state_unknown'),
+    (status(None, next_plan={'start':iso(60)}), 'available'),
+    (status(None, next_plan={'start':iso()}), 'life_boundary_changed'),
+    (status(None, next_plan={'start':'invalid'}), 'state_unknown'),
     (status(version=True), 'life_contract_mismatch'),
     (status(version=2), 'life_contract_mismatch'),
     (status(ready='true'), 'state_unknown'), (status(sleeping=None), 'state_unknown'),
@@ -47,7 +63,8 @@ def test_activity_rules(kind, category, reason):
 def test_sleep_and_health_boundaries(value, reason):
     assert evaluate_status(value, 'social', now=NOW)['reason']==reason
 
-@pytest.mark.parametrize('field', ['version','ready','enabled','schedule_enabled','updated_at','sleeping','awake_until','current'])
+@pytest.mark.parametrize('field', ['version','ready','enabled','schedule_enabled','updated_at','queried_at',
+                                 'sleeping','effective_sleeping','sleep_until','awake_until','current','next_plan'])
 def test_missing_fields_never_allow(field):
     value=status(); del value[field]
     assert evaluate_status(value,'social',now=NOW)['decision']=='deny'
@@ -60,7 +77,7 @@ def test_unknown_or_expired_activity(field,value):
 @pytest.mark.asyncio
 async def test_public_state_is_only_accepted_with_explicit_official_protocol():
     now=datetime.now(timezone.utc).isoformat()
-    s=status(None, schedule_enabled=False, updated_at=now)
+    s=status(None, schedule_enabled=False, updated_at=now, queried_at=now)
     manager, supervisor, entry=backend(s)
     entry.public=True
     configured=dict(plugin_id='ilworkcn.maiweave', api='get_life_status', protocol='maiweave_status_v1')

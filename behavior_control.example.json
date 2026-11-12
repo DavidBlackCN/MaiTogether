@@ -20,6 +20,16 @@
         "github.a0000xz.maibot-tarots-plugin"
       ],
       "cross_target_plugins": []
+    },
+    {
+      "platform": "qq",
+      "account_id": "123456789",
+      "scope": null,
+      "chat_type": "space",
+      "target_id": "123456789",
+      "providers": ["life"],
+      "autonomous_plugins": ["ilworkcn.maiweave"],
+      "cross_target_plugins": ["ilworkcn.maiweave"]
     }
   ],
   "management_commands": []

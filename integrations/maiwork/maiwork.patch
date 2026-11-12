@@ -1,14 +1,5 @@
 --- a/_manifest.json
 +++ b/_manifest.json
-@@ -16,7 +16,7 @@
-   },
-   "sdk": {
-     "min_version": "2.8.1",
--    "max_version": "2.16.0"
-+    "max_version": "2.21.0"
-   },
-   "dependencies": [
-     {
 @@ -49,7 +49,8 @@
      "api.call",
      "api.list",
@@ -21,7 +12,7 @@
      "default_locale": "zh-CN",
 --- a/maiwork/app.py
 +++ b/maiwork/app.py
-@@ -555,6 +555,9 @@
+@@ -567,6 +567,9 @@
              logger.exception("配置迁移（数据库 → config.toml）出错，按现有配置继续启动")
          # 2. 宿主（预热 bot_qq，失败不致命）
          self.host = Host(self._ctx)
@@ -31,23 +22,23 @@
          # 群号 → 平台（qq / telegram）：Host 里不传 platform 的调用按配置自动认
          self.host.set_platform_resolver(lambda gid: self.get_settings().platform_of(gid))
          self.host.set_session_group_resolver(self._group_for_session_cached)
-@@ -576,6 +579,7 @@
-             self.store, self.get_settings, transport=self.http_transport,
+@@ -589,6 +592,7 @@
              config_writer=self._write_config_and_apply,
+             runtime_bus=self.runtime_bus,
          )
 +        self.models.together = self.together
          self.profiles = self._make_profiles()
          # 关注成员个人画像模块（persona.py；模块没就位还不至于拖垮别的）
          self.personas = self._make_personas()
-@@ -613,6 +617,7 @@
-             logger.exception("每群三份启动迁移出错，按现状继续启动（旧来源留到下次再迁）")
+@@ -627,6 +631,7 @@
  
-         self.jev = Jev(self.store, self.get_settings, transport=self.jev_transport)
+         self.jev = Jev(self.store, self.get_settings, transport=self.jev_transport,
+                        runtime_bus=self.runtime_bus)
 +        self.jev.together = self.together
          # 搜索（2026-10）：内置服务全删，只走「扩展」里绑定的那个 MCP——Search 现读
          # kv["extensions.search"] 绑定 + Extensions 的运行状态；扩展在 _start_extensions 才连上，
          # 这里先建好壳子（available() 现查，不缓存）。
-@@ -916,6 +921,7 @@
+@@ -932,6 +937,7 @@
              logger.exception("回收非服务群残留出错，继续")
          # 4. 收消息
          self._intake = self._make_intake()
@@ -55,7 +46,7 @@
          for gid in settings.groups:
              await self._intake.refresh_reply_indexes(gid)
          # 5. 每个服务群建行 + token
-@@ -2328,7 +2334,7 @@
+@@ -2398,7 +2404,7 @@
          if module_cls is None:
              return None
          try:
@@ -64,7 +55,7 @@
          except Exception:
              logger.exception("建 HereNow 出错，网页链接交付这次跳过")
              return None
-@@ -2902,6 +2908,10 @@
+@@ -2987,6 +2993,10 @@
  
      async def _run_task_guarded(self, task_id: str) -> None:
          tid = str(task_id)
@@ -75,7 +66,7 @@
          cancelled = False
          try:
              if self.coordinator is not None:
-@@ -2917,6 +2927,7 @@
+@@ -3002,6 +3012,7 @@
          except Exception:
              logger.exception("任务 %s 执行出错", tid)
          finally:
@@ -83,7 +74,7 @@
              self._running_tasks.discard(tid)
              if not cancelled:
                  self._restart_if_requeued(tid)
-@@ -3255,6 +3266,8 @@
+@@ -3340,6 +3351,8 @@
              self._remember_session_row(gid, sig.session_id, sig.last_ts)
          # 2) 每个服务群串行处理；单个群出错不影响别的
          for gid in list(self._settings.groups.keys()):
@@ -92,7 +83,7 @@
              if self._intake is not None:
                  await self._intake.refresh_reply_indexes(gid, now)
              try:
-@@ -4197,6 +4210,8 @@
+@@ -4309,6 +4322,8 @@
              run_ref.detach()  # 别带着起它的那一轮（如管理员对话）的标记跑完整个长活
              cancelled = False
              try:
@@ -144,9 +135,9 @@
 -            return "只有 bot 管理员或本群管理员能批准 / 拒绝"
 +            return "只有配置的任务管理员能批准 / 拒绝"
          rid_s = str(rid or "").strip()
-         if not rid_s:
-             try:
-@@ -616,7 +620,7 @@
+         # 提醒文案里的占位符「ID」（/mw 批准 ID）不是真编号：照「没带 ID」处理，
+         # 一件待批直接批它、多件就列编号让人选。
+@@ -620,7 +624,7 @@
      # /mw 取消 [ID]：发起人 / 群主 / 群管理 / bot 管理员
      # ------------------------------------------------------------------
  
@@ -155,7 +146,7 @@
          ident_s = str(ident or "").strip().upper()
          if not ident_s or "-" not in ident_s:
              return "把要取消的 ID 带上（任务 T-x、目标 G-x、提醒 M-x），比如 /mw 取消 T-3"
-@@ -647,6 +651,10 @@
+@@ -651,6 +655,10 @@
              allowed = self._approvals.can_cancel(
                  kind, ident_s, user_id, group_role=str(role or ""), group_id=gid
              )
@@ -168,14 +159,14 @@
              allowed = False
 --- a/maiwork/config.py
 +++ b/maiwork/config.py
-@@ -483,7 +483,16 @@
+@@ -485,7 +485,16 @@
      bot_names: list[str] = Field(default_factory=list, description="机器人显示名；保存后下次加载注册")
  
  
 +class TogetherSectionConfig(PluginConfigBase):
 +    __ui_label__ = "MaiTogether 联动"
 +    enabled: bool = Field(default=True, description="查询生活状态和 Identity 管理员；发送必须经过配套 MaiTogether")
-+    life_provider: str = Field(default='vita', pattern='^(vita|maiweave)$', description="生活后端：vita 或 maiweave；需与 MaiTogether 的后端保持一致")
++    life_provider: str = Field(default='maiweave', pattern='^maiweave$', description="使用 MaiWeave 的公开生活状态")
 +    life_max_age_seconds: int = Field(default=180, ge=10, le=3600, description="MaiWeave 状态最大年龄（秒）；与 Host 保持一致，须大于生活更新间隔")
 +    public_publish: bool = Field(default=False, description="允许向公开网站发布成品、回退附件及续期；关闭时文件保留在工作台")
 +
@@ -185,7 +176,7 @@
      plugin: PluginSectionConfig = Field(default_factory=PluginSectionConfig)
      groups: GroupsSectionConfig = Field(default_factory=GroupsSectionConfig)
      focus: FocusSectionConfig = Field(default_factory=FocusSectionConfig)
-@@ -967,6 +976,7 @@
+@@ -971,6 +980,7 @@
      # App 启动时先设 False，只有 migrate_group_controls 真跑成功才开（见
      # app._open_group_controls_seed_gate）。门关着时 GroupApprovals / group_push
      # 读**已有**合法记录照旧尊重，但缺失记录只回安全默认、绝不播种。
@@ -193,7 +184,7 @@
      group_controls_seed_ready: bool = True
      problems: tuple[str, ...] = ()
  
-@@ -1748,6 +1758,7 @@
+@@ -1753,6 +1763,7 @@
  
  
  _SECTIONS: tuple[tuple[str, type[PluginConfigBase]], ...] = (
@@ -201,7 +192,7 @@
      ("plugin", PluginSectionConfig),
      ("groups", GroupsSectionConfig),
      ("focus", FocusSectionConfig),
-@@ -1932,6 +1943,7 @@
+@@ -1938,6 +1949,7 @@
              token_limit=max(0, _clamp_int(getattr(tasks_cfg, "token_limit", 2_000_000), 0, 10**9, 2_000_000)),
              run_seconds=max(0, _clamp_int(getattr(tasks_cfg, "run_seconds", 10800), 0, 30 * 86400, 10800)),
          ),
@@ -267,7 +258,7 @@
              {"group_id": group_id, "file": path, "name": name},
 --- a/maiwork/intake.py
 +++ b/maiwork/intake.py
-@@ -510,6 +510,9 @@
+@@ -746,6 +746,9 @@
              message = kwargs.get("message")
              if not isinstance(message, dict):
                  return _CONTINUE
@@ -279,7 +270,7 @@
              # 上次进程留下的待判 @ spool：每个进程补一次（纯 spawn，钩子里零磁盘等待；
 --- a/maiwork/jev.py
 +++ b/maiwork/jev.py
-@@ -564,6 +564,9 @@
+@@ -661,6 +661,9 @@
              timeout_ms: 单次调用超时，默认 settings.jev.timeout_ms。
          """
          if not self.available():
@@ -291,7 +282,7 @@
          target = self._target()
 --- a/maiwork/models.py
 +++ b/maiwork/models.py
-@@ -2634,6 +2634,9 @@
+@@ -2936,6 +2936,9 @@
            `ModelError`（含 400 适配路径）→ None。
          """
          agent_kind = str(agent or "").strip() or ("main" if str(role or "") == "main" else "task")
@@ -301,7 +292,7 @@
          recipe = self._prefix_recipe_lookup(agent_kind, group_id, task_id, purpose)
          if recipe is None or not str(instruction or ""):
              return None
-@@ -3395,8 +3398,14 @@
+@@ -3697,8 +3700,14 @@
      ) -> ChatResult:
          """chat 的实现体，只供 chat 调用（外层的 async with main_run.auto 包着它；
          没合回一个函数只是因为合回会让整个函数体多缩进一层）。"""
@@ -316,18 +307,23 @@
          agent_kind = str(agent or "").strip()
          if not agent_kind:
              agent_kind = "main" if str(role or "") == "main" else "task"
-@@ -3582,6 +3591,8 @@
+@@ -3890,9 +3899,12 @@
+                     })
+                 start = clock.now()
                  status = 0
+-                flight = self._flight_start(agent_kind, model, group_id, purpose=purpose)
++                flight = None
                  try:
                      async with self._throttle.slot(endpoint, concurrency=max_conc, max_rpm=max_rpm):
 +                        if together is not None:
 +                            await together.model_guard(group_id, task_id)
++                        flight = self._flight_start(agent_kind, model, group_id, purpose=purpose)
                          status, err_text, data = await asyncio.wait_for(
-                             self._post_protocol(client, protocol, url, body, headers, timeout), timeout=timeout
-                         )
+                             self._post_protocol(client, protocol, url, body, headers, timeout, flight=flight),
+                             timeout=timeout,
 --- a/maiwork/outbox.py
 +++ b/maiwork/outbox.py
-@@ -819,6 +819,11 @@
+@@ -855,6 +855,11 @@
              return int(row["id"])
          now = clock.now()
          with (self._store.tx() if conn is None else nullcontext(conn)) as conn:
@@ -339,7 +335,7 @@
              cur = conn.execute(
                  "INSERT INTO outbox (key, group_id, kind, payload, status, attempts,"
                  " result, error, task_id, not_before, created, updated)"
-@@ -1439,6 +1444,9 @@
+@@ -1523,6 +1528,9 @@
              try:
                  file_id = await self._host.upload_group_file(gid, str(safe_path), name)
              except HostError as exc:
@@ -349,9 +345,9 @@
                  # 只有「QQ 端读不到路径」（调 QQ 之前就失败、上传肯定没执行）才重传一次，
                  # 改用 base64:// 带内容；其余错误（超时、未知）绝不重传——上传不幂等
                  if upload_error_kind(str(exc)) != "path_unreadable":
-@@ -2005,6 +2013,18 @@
-                     self._postpone(oid, gid, reason or "推送节制", now, payload=payload)
-                     continue
+@@ -2108,6 +2116,19 @@
+                 continue
+             payload = prepared_payload
  
 +            from .together import integration
 +            together = integration(self._host)
@@ -363,28 +359,30 @@
 +                if not permitted:
 +                    self._set(oid, status='pending', error=together.last_reason,
 +                              not_before=now+60, moment=now)
++                    skipped.add(oid)
 +                    continue
 +
-             # 先落库 sending（CAS：只有仍是 pending 且到点的行才抢得到），再执行（崩了 recover 能捡到）
-             attempts = self._claim(oid, moment=now)
+             # 先原子领取 sending 并持久化轻量更新后的载荷，再执行渠道发送。
+             attempts = self._claim(oid, payload=payload, moment=now)
              if attempts <= 0:
-@@ -2017,6 +2037,13 @@
-                 result = await self._execute(row)
-             except Exception as exc:
-                 err = _redact(str(exc), [])
+@@ -2147,6 +2168,14 @@
+                         )
+                     except Exception:
+                         pass
 +                from .together import DeliveryError
 +                if isinstance(exc, DeliveryError):
 +                    status = 'pending' if exc.state == 'deferred' else 'uncertain' if exc.state in ('unknown','partial') else 'failed'
 +                    self._set(oid, status=status, error=err, moment=now, not_before=now+60)
 +                    self._fire_result(_row_after(self._store, oid), payload,
 +                        outcome=status, error=err, now=now)
-+                    continue  # Never turn a policy refusal or uncertain delivery into a public upload
++                    skipped.add(oid)
++                    continue
                  if self._is_timeout(exc):
                      # 超时：可能已经发出去了，绝不重发
                      self._set(oid, status="uncertain", error=err, moment=now)
 --- a/maiwork/rules.py
 +++ b/maiwork/rules.py
-@@ -621,6 +621,8 @@
+@@ -606,6 +606,8 @@
      _F("tasks.run_seconds", "时长上限（秒）", "单个任务运行超过该时长时暂停；0 表示不限制。", "int", min=0, max=30*86400),
  
      # ---- console ----
@@ -393,7 +391,7 @@
      _F("console.listen", "监听地址", "格式为 IP:端口。", "str", check=_check_listen),
      _F("console.password", "管理密码", "", "secret"),
      _F("console.public_url", "公开网址", "用于生成群链接，例如 https://maiwork.example.com。", "str", check=_check_public_url),
-@@ -696,6 +698,7 @@
+@@ -681,6 +683,7 @@
  ]
  
  CONFIG_SECTIONS: list[dict[str, str]] = [
@@ -403,7 +401,7 @@
      {"id": "feeds", "label": "资讯"},
 --- a/maiwork/session_gate.py
 +++ b/maiwork/session_gate.py
-@@ -282,6 +282,10 @@
+@@ -285,6 +285,10 @@
              if candidate is None:
                  return _CONTINUE
              gid, platform, uid, message, snapshot, admin, ats = candidate

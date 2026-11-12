@@ -35,14 +35,14 @@ python3 tools/prepare.py --host ../MaiBot --output ../MaiTogether-ready --apply
 
 ## 3. 填写机器人账号和群号
 
-把输出目录中的 `behavior_control.example.json` 复制到 **Bot 实例的** `config/behavior_control.json`，编辑这两个字段：
+把输出目录中的 `behavior_control.example.json` 复制到 **Bot 实例的** `config/behavior_control.json`。将所有 `123456789` 替换为机器人自己的 QQ 号，将群聊项的 `987654321` 替换为群号：
 
 ```json
 "account_id": "机器人自己的QQ号",
 "target_id": "要管理的群号"
 ```
 
-其他设置先保持示例值。管理多个群时，复制 `targets` 中的一整项并分别填写群号；MaiHush 里也添加这些群。文件是 JSON，不支持注释。
+示例还包含一项 `chat_type: "space"`，其中 `account_id` 和 `target_id` 都填机器人 QQ 号，用于 MaiWeave 空间发布。其他设置先保持示例值。管理多个群时，只复制 `chat_type: "group"` 的项并分别填写群号；MaiHush 里也添加这些群。文件是 JSON，不支持注释。
 
 实例目录就是这个 Bot 的 `config/`、`data/`、`plugins/` 所在目录。通过 `maibot run --directory ...` 启动时使用指定目录；直接从源码启动且未设置实例路径时，通常就是主程序目录。
 

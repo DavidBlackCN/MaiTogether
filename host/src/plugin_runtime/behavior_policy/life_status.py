@@ -22,9 +22,9 @@ def timestamp(value):
 
 
 def evaluate_status(status, category, *, max_age_seconds=180, now=None):
-    """Fail closed on ambiguous idle until upstream exposes effective sleep.
+    """Read effective sleep from MaiWeave's own life rules.
 
-updated_at measures state progression, not query time or a health heartbeat.
+queried_at dates the decision; updated_at dates stored energy, mood and location.
 Each caller obtains a fresh response; this function does not cache permissions.
 """
     result = {'version': 1, 'decision': 'deny', 'reason': 'state_unknown'}
@@ -46,10 +46,13 @@ Each caller obtains a fresh response; this function does not cache permissions.
         at = datetime.now(timezone.utc).timestamp() if now is None else now
         if not math.isfinite(at):
             return result
-        age = at - timestamp(status['updated_at'])
+        queried = timestamp(status['queried_at'])
+        age = at - queried
         if not -5 <= age <= max_age_seconds:
             return deny('life_state_stale')
-        if type(status.get('sleeping')) is not bool:
+        if timestamp(status['updated_at']) > queried + 5:
+            return result
+        if any(type(status.get(key)) is not bool for key in ('sleeping', 'effective_sleeping')):
             return result
         # Absence and explicit null differ: required fields cannot silently disappear.
         awake = status['awake_until']
@@ -66,14 +69,26 @@ Each caller obtains a fresh response; this function does not cache permissions.
         sleeping_plan = activity is not None and activity['kind'] == 'sleep'
         if status['sleeping'] != sleeping_plan:
             return result
+        # An idle response can cross the start of its next plan in transit.
+        next_plan = status['next_plan']
+        if next_plan is not None:
+            if not isinstance(next_plan, dict):
+                return result
+            if timestamp(next_plan['start']) <= at:
+                return deny('life_boundary_changed')
+        sleep_until = status['sleep_until']
+        if status['effective_sleeping']:
+            if (not status['schedule_enabled'] or awake is not None
+                    or (activity is not None and not sleeping_plan)):
+                return result
+            if timestamp(sleep_until) <= at:
+                return deny('life_boundary_changed')
+        elif sleep_until is not None or (status['schedule_enabled'] and sleeping_plan and awake is None):
+            return result
     except (KeyError, TypeError, ValueError, OverflowError):
         return result
-    if status['schedule_enabled']:
-        if awake is None and status['sleeping']:
-            return deny('sleeping')
-        if awake is None and activity is None:
-            # v1 omits the stored sleep_end used internally after temporary waking.
-            return deny('sleep_state_ambiguous')
+    if status['effective_sleeping']:
+        return deny('sleeping')
     if activity is not None and activity['kind'] in BUSY_KINDS:
         return deny('busy')
     return {**result, 'decision': 'allow', 'reason': 'available'}

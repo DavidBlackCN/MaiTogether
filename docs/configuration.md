@@ -6,18 +6,20 @@
 
 ## 管理哪些会话
 
-每个 `targets` 项代表一个群或一个私聊对象：
+每个 `targets` 项代表一个群、私聊对象或机器人自己的 QQ 空间：
 
 | 字段 | 填法 |
 | --- | --- |
 | `platform` | QQ 使用 `"qq"` |
 | `account_id` | 机器人 QQ 号，字符串 |
 | `scope` | 未设置连接器 scope 时用 `null`；设置过则与连接器一致 |
-| `chat_type` | 群聊用 `"group"`，私聊用 `"private"` |
-| `target_id` | 群号或私聊对象 QQ 号，字符串 |
-| `providers` | 群聊用 `["life", "hush"]`；私聊用 `["life"]` |
+| `chat_type` | 群聊 `"group"`，私聊 `"private"`，自己的空间 `"space"` |
+| `target_id` | 群号或私聊对象 QQ 号；空间填写与 `account_id` 相同的机器人 QQ 号 |
+| `providers` | 群聊用 `["life", "hush"]`；私聊、空间用 `["life"]` |
 
 `life` 检查 MaiWeave 生活状态，`hush` 检查群静音。名单外的会话不做这两项检查；开启统一控制后，未知 QQ 动作、敏感读取及未授权群管理操作仍会拒绝。
+
+示例已包含 MaiWeave 空间发布设置，替换示例 QQ 号即可。空间必须显式列出，未配置时拒绝发布；它不使用群静音策略。
 
 同群有多个机器人时，每个账号分别设置；不要把一个 Bot 的配置文件复制给所有实例。Hush 中的 `bot_account_id`、`route_scope` 也应对应。
 
@@ -31,7 +33,7 @@
 
 加入名单不会打开插件自己的主动功能，也不会免除睡眠和静音检查。
 
-`cross_target_plugins` 允许插件从一个会话向另一个受管理会话发起动作，默认 `[]`。只在确实需要跨群功能时设置。
+`cross_target_plugins` 允许插件从一个会话向另一个受管理目标发起动作。群聊示例为 `[]`；空间示例只允许 MaiWeave 从聊天入口触发自己的空间发布。只在确实需要跨群功能时扩大名单。
 
 ## 管理权限
 
@@ -41,6 +43,6 @@
 
 ## 生活状态和配置位置
 
-生活后端默认是 MaiWeave，无需填写 API 名称或协议版本。`life_provider.max_age_seconds` 默认 180 秒，使用较慢生活更新间隔时需相应调整。详细规则见 [MaiWeave](plugins/maiweave.md)，接口开发见 [Life Provider](life-provider.md)。
+生活后端默认是 MaiWeave，无需填写 API 名称或协议版本。`life_provider.max_age_seconds` 限制查询结果的最长有效时间，默认 180 秒，每次发送检查仍会重新查询。详细规则见 [MaiWeave](plugins/maiweave.md)，接口开发见 [Life Provider](life-provider.md)。
 
 `enabled` 控制这套发送检查是否启用。也可用 `MAIBOT_BEHAVIOR_CONFIG` 环境变量指定配置文件；多实例一般使用各自的默认路径，以免共享同一份配置。

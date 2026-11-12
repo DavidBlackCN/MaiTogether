@@ -13,8 +13,9 @@
 | 原因 | 先检查什么 |
 | --- | --- |
 | `life:sleeping`、`life:busy` | MaiWeave 当前生活状态 |
-| `sleep_state_ambiguous` | 当前生活接口无法确定是否仍应睡眠，见 [MaiWeave 说明](plugins/maiweave.md) |
-| `life_state_stale` | MaiWeave 是否正常更新生活状态 |
+| `state_unknown` | MaiWeave 是否使用配套适配包，接口是否返回完整状态 |
+| `life_state_stale` | 查询时间是否过期，宿主与插件的系统时间是否一致 |
+| `life_boundary_changed` | 查询期间活动或唤醒期限已变化，下一次动作会重新查询 |
 | `LIFE_PROVIDER_MISSING`、超时 | MaiWeave 是否加载成功；其他必要插件是否正常 |
 | `BEHAVIOR_BACKGROUND_TARGET_DENIED` | 运行配置中对应会话的名单是否与示例一致；清单外插件见[自动行动权限](configuration.md#哪些插件可以自动行动) |
 | `BEHAVIOR_ADAPTER_CONTRACT_UNAVAILABLE` | 是否使用配套连接器，以及账号、scope 是否一致 |

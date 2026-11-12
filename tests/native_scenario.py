@@ -52,7 +52,7 @@ async def run(work):
             elif action.startswith('get_') or action.startswith('can_'): data={}
             else:
                 writes.append({'action':action,'params':params})
-                data={'message_id':-100-len(writes), 'file_id':'fixture-file'}
+                data={'message_id':-100-len(writes), 'file_id':'fixture-file', 'tid':'fixture-post'}
                 if faults['drop']==action: continue
             await ws.send_json({'status':'ok','retcode':0,'data':data,'echo':body['echo']})
         return ws
@@ -93,11 +93,16 @@ async def run(work):
         from maiwork_native import configure
         configure(work, configs, port)
     if weave:
-        configs['maiweave'] = {'plugin': {'enabled': True, 'config_version': '0.9.0'},
+        configs['maiweave'] = {'plugin': {'enabled': True, 'config_version': '0.11.4'},
             'life': {'enabled': True, 'autonomous': False, 'model_task': 'test'},
             'world': {'weather_enabled': False, 'news_enabled': False, 'search_enabled': False, 'places_enabled': False},
             'proactive': {'enabled': False}, 'memory': {'enabled': False}}
         if 'maiwork' in configs: configs['maiwork']['together']['life_provider'] = 'maiweave'
+    if os.environ.get('POST_PROCESSING_TEST') == '1':
+        configs['post_processing'] = {'plugin': {'enabled': True, 'config_version': '1.4.5'},
+            'response_splitter': {'enable': '关闭', 'yield_to_other_plugins': True, 'final_newline_action': '保持原样'},
+            'empty_reply_fallback': {'enabled': False}, 'cross_chat_recall': {'enabled': False}}
+        configs['segmentation'] = {'plugin': {'enabled': True, 'config_version': '1.2.0'}}
     for folder,config in configs.items():
         (work/'plugins'/folder/'config.toml').write_text(tomli_w.dumps(config),encoding='utf-8')
     (work/'behavior.json').write_text(json.dumps({'enabled':True, 'life_provider':{'plugin_id':LIFE,'api':'evaluate_behavior','version':'1','protocol':'decision_v1'},'targets':[{
@@ -418,7 +423,15 @@ async def run(work):
                 assert not (await probe('api'))['success'] and len(writes)==before
             finally: setattr(state,key,old_value)
         cases.append('missing_contract_account_scope_mismatch_fail_closed')
-        await chat_manager.get_or_create_session('qq','10001','987654321',account_id='222222222',scope=None)
+        second_session=await chat_manager.get_or_create_session('qq','10001','987654321',account_id='222222222',scope=None)
+        second_message=raw('second account route discovery')
+        second_message.session_id=second_session.session_id
+        second_message.account_id='222222222'
+        await manager.invoke_hook('chat.receive.after_process', message=serialize_session_message(second_message))
+        async def second_route_ready():
+            binding=await call(HUSH,'get_public_route_binding',{'stream_id':second_session.session_id})
+            return binding['ok']
+        await wait(second_route_ready)
         get_policy().targets.append({**get_policy().targets[0],'account_id':'222222222'})
         assert (await command('/maihush mute 5m'))[0]
         async def switch_account(number):

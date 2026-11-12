@@ -30,7 +30,11 @@ Host 使用 `social` 查询；MaiWork 的共享解析器还支持 `work`，用�
 
 仅接受正式注册、启用且版本相符的静态 API。`maiweave_status_v1` 只接受上述固定公开接口，不允许任意公开 API 提供授权。调用期间插件被卸载、替换或改变接口属性时，返回结果作废。
 
-每次读取当前状态，不缓存“允许发送”。检查就绪状态、活动时段、临时唤醒期限和更新时间；状态不完整或不明确时拒绝。`updated_at` 表示生活推进时间，不是服务健康证明。具体限制见 [MaiWeave 页面](plugins/maiweave.md#当前状态判断限制)。
+使用 MaiWeave 0.11.3 新增的 `effective_sleeping`、`sleep_until` 和 `queried_at`。每次发送检查重新查询，检查就绪状态、活动时段、临时唤醒与睡眠截止时间。缺少必要字段、结果过期或时间边界已变化时拒绝。
+
+`queried_at` 用于结果有效期检查，`updated_at` 记录精力、心情与位置等保存状态的更新时间。实际睡眠由 `effective_sleeping` 决定，正常空闲可以放行。Host 的社交动作和 MaiWork 的新任务仍在工作、学习、出行时暂停。
+
+MaiWeave 同时提供公开的 `evaluate_behavior(behavior="conversation" | "proactive")`。它的对话规则允许部分午睡回复，主动规则的活动范围也与本项目有所不同。当前接入继续读取 `get_life_status`，执行统一的实际睡眠与忙碌限制。具体行为见 [MaiWeave 页面](plugins/maiweave.md#状态判断)。
 
 ## 其他后端
 

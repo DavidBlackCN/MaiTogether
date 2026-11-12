@@ -2,7 +2,7 @@
 
 普通安装见[安装与设置](setup.md)。本页供维护者更新补丁、构建和测试。
 
-当前配套：Host 1.4.2、SDK 2.21.0、QQ 连接器 1.1.13，MaiTogether 修改版本 0.5.0。准确提交见 [baseline.json](../baseline.json)。
+当前配套使用 Host 1.4.2、SDK 2.21.0、QQ 连接器 1.1.13，MaiTogether 修改版本为 0.6.0。准确提交见 [baseline.json](../baseline.json)。
 
 ## 目录
 
@@ -11,7 +11,7 @@
 | `host/`、`adapter/` | 本项目新增模块，不是完整安装目录 |
 | `patches/` | 对官方文件的修改；`series.json` 列出修改范围 |
 | `locks/` | 完整 Host 和连接器的两份文件校验清单 |
-| `integrations/` | MaiWeave 接口记录、MaiWork 适配 |
+| `integrations/` | MaiWeave、MaiWork 的固定源码、适配补丁和构建工具 |
 | `tools/`、`tests/` | 安装、构建、升级和验证工具 |
 | `docs/plugins/` | 每个选用插件的版本、配置和搭配说明 |
 
@@ -66,7 +66,11 @@ python tools/run_native.py --life-provider --workspace .. --host ../control-buil
 
 `--native-chat` 检查消息仍进入官方聊天、记忆处理入口，同时睡眠会阻止对外动作。它不验证真实模型的理解与生成效果。
 
-MaiWeave 完整组合另传 `--maiweave <已审查源码>`；工作联动再加 `--maiwork <已构建适配>`。先审查 MaiWeave 当时默认分支最新源码并更新准确提交记录，不把旧版本结果套用到新版本。Host 回归不等于这两项完整组合通过。
+MaiWeave 完整组合另传 `--maiweave <已构建适配>`；工作联动再加 `--maiwork <已构建适配>`。构建方法分别见 [MaiWeave](../integrations/maiweave/README.md) 和 [MaiWork](../integrations/maiwork/README.md)。两者都会检查来源、补丁和文件哈希。先审查 MaiWeave 当时默认分支最新源码并更新准确提交记录，不把旧版本结果套用到新版本。Host 回归不等于这两项完整组合通过。
+
+同时验证消息后处理与智能分段时，再传 `--post-processing <Cateye源码> --segmentation <智能分段源码>`，测试配置会关闭 Cateye 分段。
+
+可用 `--smart-poke <源码>` 检查新的 Smart Poke 提交。每轮输出都会记录实际参测文件哈希，不用旧版本结果代替新版验收。
 
 进程正常退出后才生成 `acceptance.json`。真实 QQ、SnowLuma 客户端、Linux 服务器及长期运行需另行验证。
 

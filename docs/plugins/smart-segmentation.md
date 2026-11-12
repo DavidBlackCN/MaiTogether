@@ -19,5 +19,5 @@ enable = false
 
 ## 补充说明
 
-- 与 [Cateye 后处理](cateye-post-processing.md)搭配时，只保留其中一套分段功能。
+- 与 [Cateye 后处理](cateye-post-processing.md)同时使用，由本插件负责分段，关闭 Cateye 自带分段。
 - 示例配置已允许后台发送后续分段。每段单独检查；中途睡眠或静音可能只发出前几段，不应把整段回复重新发送。

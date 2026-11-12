@@ -49,6 +49,19 @@ def build(source, output, *, patch=True):
     return output
 
 
+def verify(directory):
+    record=json.loads((directory/'maitogether-build.json').read_text(encoding='utf-8'))
+    pin=json.loads((ROOT/'baseline.json').read_text(encoding='utf-8'))
+    files={p.relative_to(directory).as_posix():hashlib.sha256(p.read_bytes()).hexdigest()
+           for p in directory.rglob('*') if p.is_file() and '__pycache__' not in p.parts
+           and p.name!='maitogether-build.json'}
+    inputs={p.relative_to(ROOT).as_posix():hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in [ROOT/'maiwork.patch',*sorted((ROOT/'modules').rglob('*.py'))]}
+    inputs['shared/life_status.py']=hashlib.sha256(LIFE_STATUS.read_bytes()).hexdigest()
+    if record['baseline']!=pin or record['files']!=files or record['inputs']!=inputs:
+        raise ValueError('MaiWork build changed; rebuild before acceptance')
+
+
 if __name__ == '__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source',type=Path,required=True)

@@ -13,7 +13,7 @@ get_group_ignore_add_request get_unidirectional_friend_list get_profile_like get
 SOCIAL = frozenset('''send_msg send_group_msg send_private_msg send_forward_msg
 send_group_forward_msg send_private_forward_msg send_poke group_poke friend_poke
 set_msg_emoji_like unset_msg_emoji_like send_like set_group_sign send_group_sign
-upload_group_file upload_private_file send_group_ai_record'''.split())
+upload_group_file upload_private_file send_group_ai_record send_qzone_msg'''.split())
 MANAGEMENT = frozenset('''set_group_ban set_group_whole_ban set_group_kick delete_msg
 set_group_card set_group_name set_group_admin set_group_special_title
 set_group_add_request set_friend_add_request delete_group_file set_essence_msg delete_essence_msg'''.split())

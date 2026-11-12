@@ -54,13 +54,16 @@ class BehaviorPolicy:
         seen = set()
         for target in self.targets:
             if (not all(target.get(k) for k in ('platform', 'account_id', 'chat_type', 'target_id'))
-                    or target['chat_type'] not in ('group', 'private')
+                    or target['chat_type'] not in ('group', 'private', 'space')
                     or not isinstance(target.get('providers'), list)):
                 raise ValueError('Invalid behavior target/providers')
             key=tuple(target.get(k) or None for k in ('platform','account_id','scope','chat_type','target_id'))
             if key in seen: raise ValueError('Duplicate behavior target')
             seen.add(key)
             target['providers'] = self.life.normalize(target['providers'])
+            if target['chat_type'] == 'space' and (target['platform'] != 'qq'
+                    or target['target_id'] != target['account_id'] or target['providers'] != ['life']):
+                raise ValueError('Space targets require the own QQ account and life policy only')
         self.actions: Dict[str, Dict[str, Any]] = {}
         self.audit = deque(maxlen=1024)
         self.manager = None
@@ -73,6 +76,8 @@ class BehaviorPolicy:
         return self.enabled
 
     def check_origin(self, origin, stream, target):
+        if target.get('chat_type') == 'space' and origin.get('plugin') not in target.get('autonomous_plugins', []):
+            raise PermissionError('BEHAVIOR_SPACE_CALLER_DENIED')
         if origin.get('kind') == 'background' and origin.get('plugin') not in target.get('autonomous_plugins', []):
             raise PermissionError('BEHAVIOR_BACKGROUND_TARGET_DENIED')
         if (origin.get('kind') in ('tool', 'command') and origin.get('stream_id') != stream
@@ -136,6 +141,10 @@ class BehaviorPolicy:
         if (state is None or state.account_id != route['account_id'] or (state.scope or None) != route.get('scope')
                 or (args.get('connection') and state.metadata.get('behavior_connection') != args['connection'])):
             raise PermissionError('BEHAVIOR_ADAPTER_CONTRACT_UNAVAILABLE')
+        if route['chat_type'] == 'space':
+            if route['target_id'] != state.account_id:
+                raise PermissionError('BEHAVIOR_SPACE_ACCOUNT_MISMATCH')
+            return
         result = await manager.evaluate_target_policy(drivers[0], key, route['chat_type'], route['target_id'])
         if not result.allowed:
             raise PermissionError('BEHAVIOR_ADAPTER_POLICY')
@@ -176,11 +185,15 @@ class BehaviorPolicy:
             raise PermissionError('BEHAVIOR_TARGET_INVALID')
         await self._adapter_route(args)
         target = self.target(route)
+        if name == 'send_qzone_msg' and (route.get('chat_type') != 'space' or target is None):
+            return {'allowed': False, 'state': 'denied', 'reason': 'BEHAVIOR_SPACE_NOT_CONFIGURED'}
+        if route.get('chat_type') == 'space' and name != 'send_qzone_msg':
+            raise PermissionError('BEHAVIOR_SPACE_ACTION_INVALID')
         if target is None:
             # Explicitly outside control. Existing adapter permission still applies.
             if kind == 'management':
                 return {'allowed': False, 'state': 'denied', 'reason': 'BEHAVIOR_MANAGEMENT_NOT_CONFIGURED'}
-        stream = await self._resolve(route) if target is not None else ''
+        stream = await self._resolve(route) if target is not None and route['chat_type'] != 'space' else ''
         invocation = current.get()
         origin = dict(invocation.origin) if invocation else {'kind': 'background', 'plugin': plugin}
         if target is not None:

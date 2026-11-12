@@ -50,8 +50,9 @@ class LifeProvider:
     async def evaluate(self, manager, request):
         if manager is None:
             raise RuntimeError('LIFE_PROVIDER_RUNTIME_UNAVAILABLE')
+        space = request.get('route', {}).get('chat_type') == 'space'
         if (request.get('category') != 'social'
-                or not isinstance(request.get('stream_id'), str) or not request['stream_id']):
+                or not isinstance(request.get('stream_id'), str) or (not request['stream_id'] and not space)):
             raise RuntimeError('LIFE_PROVIDER_REQUEST_INVALID')
         supervisor = manager._get_supervisor_for_plugin(self.plugin_id)
         if supervisor is None:

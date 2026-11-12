@@ -6,11 +6,11 @@
 
 承担多 Agent 任务、Skill、MCP、工作台和文件交付。无需再开发一套 DSH 连接插件来重复这些能力。
 
-配套适配基于 MaiWork 0.15.3，适配版本 1.1.0，完整组合记录仍为 Host 1.3.19／SDK 2.21.0。**当前 MaiTogether 的 Host 1.4.2 尚未完成 MaiWork 整套联调，暂不把旧适配包作为即装即用版本。**
+配套适配基于 MaiWork 0.17.0，适配版本 1.2.0，配合 Host 1.4.2／SDK 2.21.0 使用。版本与构建方法见上方链接。
 
 ## 推荐配置
 
-完成对应版本验证后，使用适配包并参考[推荐配置](../../integrations/maiwork/recommended.toml)：开启 `together.enabled`、选择 `maiweave`，先关闭公开网页发布。服务群、模型和执行环境在 MaiWork 内设置；MCP 只开放需要的工具。
+使用适配包并参考[推荐配置](../../integrations/maiwork/recommended.toml)：生活后端默认 MaiWeave，先关闭公开网页发布。服务群、模型和执行环境在 MaiWork 内设置；MCP 只开放需要的工具。
 
 ## 补充说明
 

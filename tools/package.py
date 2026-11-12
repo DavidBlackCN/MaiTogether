@@ -55,7 +55,13 @@ def main():
         pin=json.loads((CONTROL/'integrations/maiweave/baseline.json').read_text(encoding='utf-8'))
         if git(source,'status','--porcelain').strip() or git(source,'rev-parse','HEAD').decode().strip()!=pin['commit']:
             raise ValueError('MaiWeave source differs from the reviewed clean commit')
-        copy_files(source,out/'plugins/MaiWeave',tracked_files(source))
+        spec=importlib.util.spec_from_file_location('weave_build',CONTROL/'integrations/maiweave/build.py')
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        assembled=out/'maiweave-assembly'
+        module.build(source,assembled)
+        copy_files(assembled,out/'plugins/MaiWeave',
+                   [p.relative_to(assembled).as_posix() for p in assembled.rglob('*') if p.is_file()])
+        shutil.rmtree(assembled)
         pins['MaiWeave']=pin
     if a.maiwork_source:
         spec=importlib.util.spec_from_file_location('maiwork_build',CONTROL/'integrations/maiwork/build.py')

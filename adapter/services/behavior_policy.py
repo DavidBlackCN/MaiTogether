@@ -26,6 +26,11 @@ class BehaviorGate:
             return {'reference': '', 'connection': connection}
         state = self.runtime.runtime_state
         resolved = params
+        if name == 'send_qzone_msg':
+            # 空间发布目标只能是当前连接自己的账号，参数不能改成其他用户。
+            if set(params) - {'content', 'ugc_right', 'images'}:
+                raise BehaviorDenied('BEHAVIOR_SPACE_ARGUMENTS_INVALID')
+            resolved = {'user_id': state.account_id}
         if name in MESSAGE_TARGET:
             mid = params.get('message_id')
             if isinstance(mid, bool) or not str(mid).removeprefix('-').isdigit() or int(mid) == 0:
@@ -60,6 +65,8 @@ class BehaviorGate:
                 raise BehaviorDenied('BEHAVIOR_MESSAGE_TARGET_CONFLICT')
         route = dict(platform='qq', account_id=state.account_id, scope=state.scope,
                      chat_type='group' if group else 'private', target_id=str(group or user or ''))
+        if name == 'send_qzone_msg':
+            route['chat_type'] = 'space'
         digest = fingerprint({'action': name, 'params': params})
         result = await self.rpc('preflight' if preflight else 'prepare', action=name, route=route, connection=connection,
                                 digest=digest, text_digest=text_digest(params))
