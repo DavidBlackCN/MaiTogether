@@ -1,9 +1,9 @@
 {
   "repository": "https://github.com/CharTyr/MaiWork",
-  "version": "0.17.0",
-  "commit": "e375b5306942c9fab6b974228deaf20cc11ca433",
-  "adaptation": "1.2.1",
+  "version": "0.17.1",
+  "commit": "30ea5a4561cf85fcd81defce66ca36e11de36de4",
+  "adaptation": "1.2.2",
   "license": "AGPL-3.0-or-later",
-  "host": "1.4.3",
-  "sdk": "2.22.1"
+  "host": "1.4.8",
+  "sdk": "2.23.0"
 }

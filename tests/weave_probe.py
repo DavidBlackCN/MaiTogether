@@ -47,6 +47,12 @@ class AcceptanceProbe:
         return {'status': status, 'behavior': behavior, 'internal_sleeping': self.living.sleeping(now),
                 'read_only': before == list(self.store.db.iterdump())}
 
+    @API('acceptance_farewell', public=False, version='1')
+    async def acceptance_farewell(self, stream_id):
+        assert self.living.wake_for_message('晚安，去睡吧', stream_id, self.now(), '10001')
+        return [await self.sleep_before_send({'session_id': stream})
+                for stream in (stream_id, 'another-session')]
+
     @API('acceptance_person', public=False, version='1')
     async def acceptance_person(self, stream_id, user_id='10001'):
         await self.identify_person(stream_id,user_id,'qq')

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import asyncio
 
 from .context import provider_request
-from .life_status import WEAVE_PLUGIN, WEAVE_API, evaluate_status
+from .life_status import WEAVE_PLUGIN, WEAVE_API, evaluate_status, wake_decision
 
 
 @dataclass(frozen=True)
@@ -38,9 +38,9 @@ class LifeProvider:
             raise ValueError('Invalid behavior target/providers')
         return [name for name in ('life', 'hush') if name in names]
 
-    def _entry(self, supervisor, stream):
+    def _entry(self, supervisor, stream, name=None):
         entries = supervisor.api_registry.get_apis(
-            plugin_id=self.plugin_id, name=self.api, version=self.version,
+            plugin_id=self.plugin_id, name=name or self.api, version=self.version,
             enabled_only=True, session_id=stream)
         if (len(entries) != 1 or entries[0].public != (self.protocol == 'maiweave_status_v1') or entries[0].dynamic
                 or entries[0].version != self.version):
@@ -57,23 +57,34 @@ class LifeProvider:
         supervisor = manager._get_supervisor_for_plugin(self.plugin_id)
         if supervisor is None:
             raise RuntimeError('LIFE_PROVIDER_MISSING')
-        entry = self._entry(supervisor, request['stream_id'])
+        async def query(name, args):
+            entry = self._entry(supervisor, request['stream_id'], name)
+            envelope = await asyncio.wait_for(supervisor.invoke_api(
+                self.plugin_id, entry.handler_name, args, timeout_ms=150), .15)
+            if (manager._get_supervisor_for_plugin(self.plugin_id) is not supervisor
+                    or self._entry(supervisor, request['stream_id'], name) is not entry):
+                raise RuntimeError('LIFE_PROVIDER_CHANGED')
+            payload = envelope.payload
+            if envelope.error or not isinstance(payload, dict) or payload.get('success') is not True:
+                raise RuntimeError('LIFE_PROVIDER_FAILED')
+            return payload.get('result')
+
         token = provider_request.set(request)
         try:
-            envelope = await asyncio.wait_for(supervisor.invoke_api(
-                self.plugin_id, entry.handler_name, {}, timeout_ms=150), .15)
+            status = await query(self.api, {})
+            if self.protocol == 'decision_v1':
+                return validate_result(status)
+            result = evaluate_status(status, 'social', max_age_seconds=self.max_age_seconds)
+            # MaiWeave's send hook already limits ordinary Host replies to the farewell chat.
+            host_reply = (request.get('origin', {}).get('kind') == 'host'
+                          and request.get('action') in ('platform.message', 'send_msg', 'send_private_msg', 'send_group_msg')
+                          and bool(request.get('message_id')))
+            if result['decision'] == 'allow' and status['awake_until'] and not host_reply:
+                behavior = await query('evaluate_behavior', {'behavior': 'proactive'})
+                return wake_decision(behavior, status, 'social', self.max_age_seconds)
+            return result
         finally:
             provider_request.reset(token)
-        # Never use a result produced by a component unloaded/replaced in flight.
-        if (manager._get_supervisor_for_plugin(self.plugin_id) is not supervisor
-                or self._entry(supervisor, request['stream_id']) is not entry):
-            raise RuntimeError('LIFE_PROVIDER_CHANGED')
-        payload = envelope.payload
-        if envelope.error or not isinstance(payload, dict) or payload.get('success') is not True:
-            raise RuntimeError('LIFE_PROVIDER_FAILED')
-        if self.protocol == 'maiweave_status_v1':
-            return evaluate_status(payload.get('result'), request['category'], max_age_seconds=self.max_age_seconds)
-        return validate_result(payload.get('result'))
 
 
 def validate_result(result):

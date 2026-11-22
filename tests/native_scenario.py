@@ -41,7 +41,7 @@ async def run(work):
                 entered=faults.pop('read_entered');release=faults.pop('read_release')
                 entered.set();await release.wait()
             if action=='get_login_info': data={'user_id':faults['account'],'nickname':'test'}
-            elif action=='get_version_info': data={'app_name':'SnowLuma','app_version':'2.4.0'}
+            elif action=='get_version_info': data={'app_name':faults.get('client', 'SnowLuma'),'app_version':'2.4.0'}
             elif action=='get_msg': data={'message_id':params['message_id'],'message_type':'group',
                 'group_id':987654321,'user_id':10001,'message_seq':0 if faults['bad_receipt'] else 1,
                 'message':[{'type':'text','data':{'text':'test'}}]}
@@ -79,9 +79,9 @@ async def run(work):
          'management':{'source':'identity'},'reply':{'enabled':True},'social':{'enabled':True,'task_name':'test'}},
       'maibot-maiIdentity-plugin':{'plugin':{'enabled':True,'config_version':'4'},'management':{'admin_accounts':['10001']},
          'identity':{'people':[{'qq':'10003','nickname':'妈妈'}]}},
-      'adapter':{'plugin':{'enabled':True,'config_version':'2.7.1'},'client':{'server':'127.0.0.1','port':port,
+      'adapter':{'plugin':{'enabled':True,'config_version':'2.8.0'},'client':{'server':'127.0.0.1','port':port,
          'client_type':'snowluma','heartbeat_interval':0,'action_timeout_sec':2},
-         'chat_abilities':{'enable_poke_tool':True,'enable_emoji_like_tool':True}},
+         'chat_abilities':{'enable_forward_tool':True,'enable_poke_tool':True,'enable_emoji_like_tool':True}},
       'poke':{'plugin':{'enabled':True,'config_version':'1.9.0','adapter_plugin_id':ADAPTER,'record_self_poke_to_context':False},
          'reaction':{'react_probability':1.0,'cooldown_seconds':0,'max_reactions_per_minute':0,
             'text_weight':1.0,'llm_weight':0.0,'emoji_weight':0.0,'back_poke_weight':0.0,
@@ -93,7 +93,7 @@ async def run(work):
         from maiwork_native import configure
         configure(work, configs, port)
     if weave:
-        configs['maiweave'] = {'plugin': {'enabled': True, 'config_version': '0.11.4'},
+        configs['maiweave'] = {'plugin': {'enabled': True, 'config_version': '0.12.6'},
             'life': {'enabled': True, 'autonomous': False, 'model_task': 'test'},
             'world': {'weather_enabled': False, 'news_enabled': False, 'search_enabled': False, 'places_enabled': False},
             'proactive': {'enabled': False}, 'memory': {'enabled': False},
@@ -129,6 +129,9 @@ async def run(work):
     async def models(plugin_id,capability,args): return ['test']
     generating=asyncio.Event(); generated=asyncio.Event()
     async def model(plugin_id,capability,args):
+        if plugin_id == 'ilworkcn.maiweave' and 'candidate' in str(args.get('prompt')):
+            return {'success': True, 'response': json.dumps({'send': True, 'candidate': 1,
+                    'reason': 'fixture'}), 'model_name': 'local-fake'}
         if plugin_id==PROBE:
             generating.set(); await generated.wait()
             return {'success':True,'response':'test','model_name':'local-fake'}
@@ -230,6 +233,20 @@ async def run(work):
         result=await tool('react_emoji',{'message_id':'-999','emoji_id':128512})
         assert len(writes)==before+1,result
         cases.append('native_reaction_tool_success_control')
+        from src.common.utils.utils_message import MessageUtils
+        source = raw('合并转发样本')
+        await MessageUtils.store_message_to_db_async(source)
+        forward_args = {'message_ids': [source.message_id], 'stream_id': stream,
+                        'target_group_id': '987654321'}
+        before = len(writes)
+        result = await tool('forward_messages', forward_args)
+        assert len(writes) == before + 1 and 'forward' in writes[-1]['action'], result
+        assert str(writes[-1]['params']['group_id']) == '987654321'
+        await sleeping()
+        await tool('forward_messages', forward_args)
+        assert len(writes) == before + 1
+        await awake()
+        cases.append('adapter_forward_tool_uses_target_session_and_sleep_guard')
         await manager.invoke_hook('chat.receive.after_process',message=serialize_session_message(raw('麦麦先安静一会','10003')))
         async def soft_silent():
             return (await call(HUSH,'get_public_constraints',{'stream_id':stream}))['data']['soft']=='SOFT_SILENT'

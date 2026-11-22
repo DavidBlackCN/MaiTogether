@@ -92,3 +92,20 @@ Each caller obtains a fresh response; this function does not cache permissions.
     if activity is not None and activity['kind'] in BUSY_KINDS:
         return deny('busy')
     return {**result, 'decision': 'allow', 'reason': 'available'}
+
+
+def wake_decision(behavior, status, category, max_age_seconds):
+    """Temporary waking includes a farewell phase reserved for the ordinary reply."""
+    unknown = {'version': 1, 'decision': 'deny', 'reason': 'state_unknown'}
+    if (not isinstance(behavior, dict) or type(behavior.get('version')) is not int
+            or behavior['version'] != 1 or behavior.get('behavior') != 'proactive'):
+        return unknown
+    try:
+        at = timestamp(behavior['queried_at'])
+        if not timestamp(status['queried_at']) <= at < timestamp(status['awake_until']):
+            return unknown
+    except (ValueError, TypeError, KeyError, OverflowError):
+        return unknown
+    if behavior.get('decision') == 'allow' and behavior.get('reason') == 'available':
+        return evaluate_status(status, category, max_age_seconds=max_age_seconds)
+    return {**unknown, 'reason': 'farewell' if behavior.get('reason') == 'farewell' else 'state_unknown'}

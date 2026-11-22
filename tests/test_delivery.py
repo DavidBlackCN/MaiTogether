@@ -8,6 +8,21 @@ from src.plugin_runtime.behavior_policy import delivery
 from src.plugin_runtime.behavior_policy.context import contexts,current
 
 
+@pytest.mark.asyncio
+async def test_space_timeout_preserves_earlier_receipts_and_known_rejections():
+    async def invoke(plugin, capability, args):
+        current.get().results.append({'action_id': 'space', 'state': args['state']})
+        return {'success': False}
+
+    args = {'api_name': 'adapter.snowluma.qzone.send_qzone_msg'}
+    with contexts.receive('', 'fixture') as parent:
+        parent.results.append({'action_id': 'other', 'state': 'confirmed'})
+        assert await delivery.call_with_receipt(invoke, 'fixture', 'api.call', dict(args, state='denied')) == {'success': False}
+        with pytest.raises(RuntimeError, match='结果未知'):
+            await delivery.call_with_receipt(invoke, 'fixture', 'api.call', dict(args, state='unknown'))
+        assert [result['state'] for result in parent.results] == ['confirmed', 'denied', 'unknown']
+
+
 @pytest.mark.parametrize('states,sent,expected', [
     (['confirmed'], True, 'confirmed'), (['unknown'], False, 'unknown'),
     (['confirmed', 'failed'], False, 'partial'), ([], False, 'not_submitted')])

@@ -26,15 +26,14 @@
          except Exception as exc:
              return envelope.make_error_response(ErrorCode.E_BAD_PAYLOAD.value, f"能力调用 payload 非法: {exc}")
  
-@@ -77,7 +79,10 @@
+@@ -77,7 +79,9 @@
  
          # 3. 执行
          try:
 -            result = await impl(plugin_id, capability, args)
-+            from src.plugin_runtime.behavior_policy.delivery import annotate_send_result
++            from src.plugin_runtime.behavior_policy.delivery import call_with_receipt
 +            with contexts.receive(metadata.get("reference", ""), plugin_id):
-+                result = await impl(plugin_id, capability, args)
-+                result = annotate_send_result(capability, args, result)
++                result = await call_with_receipt(impl, plugin_id, capability, args)
              resp_payload = CapabilityResponsePayload(success=True, result=result)
              return envelope.make_response(payload=resp_payload.model_dump())
          except RPCError as e:

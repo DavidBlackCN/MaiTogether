@@ -4,9 +4,9 @@
 
 | 项目 | 版本 | 本项目的处理 |
 | --- | --- | --- |
-| [MaiBot](https://github.com/Mai-with-u/MaiBot) | 1.4.3 | 保存真实调用来源，检查对外动作的生活状态、静音和权限 |
-| [Plugin SDK](https://github.com/Mai-with-u/maibot-plugin-sdk) | 2.22.1 | 使用原版，没有修改 |
-| [QQ 连接器](https://github.com/Mai-with-u/MaiBot-SnowLuma-Adapter) | 1.1.13 | 在实际发送前再次检查状态，分别处理批量动作的结果 |
+| [MaiBot](https://github.com/Mai-with-u/MaiBot) | 1.4.8 | 保存真实调用来源，检查对外动作的生活状态、静音和权限 |
+| [Plugin SDK](https://github.com/Mai-with-u/maibot-plugin-sdk) | 2.23.0 | 使用原版，没有修改 |
+| [QQ 连接器](https://github.com/Mai-with-u/MaiBot-SnowLuma-Adapter) | 1.3.3 | 在实际发送前再次检查状态，分别处理批量动作的结果 |
 
 社区插件回归使用以下原版源码：
 
@@ -16,11 +16,11 @@
 - [Cateye 消息后处理 1.4.5，Host 1.4 分支](https://github.com/cateyemizuki/cateye_better_post-processing/tree/18652c37dba6fc0340a393daaf636faa901fb3a3)。
 - [智能分段 1.1.0](https://github.com/HaoxiangXia/smart_segmentation_plugin/tree/db9dd69cc37856841aa60a2724e3181cfe65b65e)。
 
-[MaiWeave 0.11.4](https://github.com/ilworkcn/MaiWeave/tree/e569331ebbb30a24da340ca94687506c1b20e704) 使用上游原版源码及 GPL-3.0-only 许可证；接口与测试记录见 [integrations/maiweave](integrations/maiweave/README.md)。生活引擎的选用和配置见 [MaiWeave](docs/plugins/maiweave.md)。
+[MaiWeave 0.12.6](https://github.com/ilworkcn/MaiWeave/tree/f56b954edbb6090a50df27d58e5ab4d05c20a55c) 使用上游原版源码及 GPL-3.0-only 许可证；接口与测试记录见 [integrations/maiweave](integrations/maiweave/README.md)。生活引擎的选用和配置见 [MaiWeave](docs/plugins/maiweave.md)。
 
 其他插件的来源见[插件清单](docs/plugins.md)，各自保留原作者和许可证。
 
-[MaiWork 0.17.0](https://github.com/CharTyr/MaiWork/tree/e375b5306942c9fab6b974228deaf20cc11ca433) 的配套适配位于 [integrations/maiwork](integrations/maiwork/README.md)。构建保留上游 AGPL-3.0-or-later 许可证、插件 ID 和作者信息；MaiWork 适配补丁与新增模块也按 AGPL-3.0-or-later 提供。
+[MaiWork 0.17.1](https://github.com/CharTyr/MaiWork/tree/30ea5a4561cf85fcd81defce66ca36e11de36de4) 的配套适配位于 [integrations/maiwork](integrations/maiwork/README.md)。构建保留上游 AGPL-3.0-or-later 许可证、插件 ID 和作者信息；MaiWork 适配补丁与新增模块也按 AGPL-3.0-or-later 提供。
 
 ## 许可证
 

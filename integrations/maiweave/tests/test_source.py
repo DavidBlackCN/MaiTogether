@@ -27,18 +27,3 @@ def test_package_preserves_upstream_runtime_and_license(tmp_path, monkeypatch):
     assert not (tmp_path / 'maitogether-build.json').exists()
     manifest = json.loads((tmp_path / '_manifest.json').read_text(encoding='utf-8'))
     assert 'behavior.send_v1' not in manifest['capabilities']
-
-
-async def test_upstream_followup_with_consistent_clock(plugin, monkeypatch):
-    # The upstream case seeds noon but express() timestamps completion using the
-    # real clock. Align just that clock to distinguish test drift from a cooldown bug.
-    from datetime import datetime
-    from maiweave.integrations import share_receipts
-    from test_proactive_followup import test_failure_waits_and_expiry_stops_retry
-    now = plugin.now().replace(hour=12, minute=0, second=0, microsecond=0)
-    class Clock(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return now.astimezone(tz) if tz else now.replace(tzinfo=None)
-    monkeypatch.setattr(share_receipts, 'datetime', Clock)
-    await test_failure_waits_and_expiry_stops_retry(plugin)

@@ -6,6 +6,24 @@ from .context import current
 from .runtime import get_policy, send_outcome
 
 
+async def call_with_receipt(impl, plugin, capability, args):
+    invocation = current.get()
+    if (invocation is not None and capability == 'api.call'
+            and args.get('api_name') in {'adapter.snowluma.qzone.send_qzone_msg', 'adapter.napcat.qzone.send_qzone_msg'}):
+        operation = replace(invocation, results=[], parent=invocation)
+        token = current.set(operation)
+        try:
+            result = await impl(plugin, capability, args)
+            if send_outcome(False) in {'unknown', 'partial'}:
+                # A normal error response means a definite rejection to OneBot callers.
+                raise RuntimeError('空间请求已提交，结果未知，请核对后再操作')
+            return result
+        finally:
+            current.reset(token)
+            invocation.results.extend(operation.results)
+    return annotate_send_result(capability, args, await impl(plugin, capability, args))
+
+
 def annotate_send_result(capability, args, result):
     """Attach receipts at the capability boundary, not inside Host send helpers."""
     if (capability in {'send.text', 'send.emoji', 'send.image', 'send.forward',

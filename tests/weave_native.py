@@ -81,9 +81,18 @@ async def run_cases(values):
     assert (await c.call(WEAVE, 'acceptance_delivery', {'mode': 'message', 'stream_id': c.stream}))['sent'] is True
     result = await publish('normal')
     assert result['status'] == '已发布', result
+    c.faults['client'] = 'NapCat'
+    try:
+        writes = len(c.writes)
+        result = await publish('napcat')
+        assert result['status'] == '发布失败' and '登录信息' in result['error'], result
+        assert 'get_cookies' not in c.all_calls and len(c.writes) == writes
+    finally:
+        del c.faults['client']
+    c.cases.append('napcat_diary_cannot_read_account_cookies')
     await seed(kind='sleep'); n = len(c.writes)
     result = await publish('sleep')
-    assert result['status'] == '待核对', result
+    assert result['status'] == '发布失败' and 'life:sleeping' in result['error'], result
     assert len(c.writes) == n
     await seed()
     assert (await c.command('/maihush mute 5m'))[0]
@@ -169,6 +178,17 @@ async def run_cases(values):
     assert status['awake_until'],status
     assert (await decision())['decision']=='allow'
     c.cases.append('upstream_keyword_wake_without_planner')
+    replies = await c.call(WEAVE, 'acceptance_farewell', {'stream_id': c.stream})
+    assert [item['action'] for item in replies] == ['continue', 'abort']
+    assert (await decision())['reason'] == 'farewell'
+    reply = await policy._provider('life', {**request, 'action': 'platform.message', 'message_id': 'reply'})
+    assert reply['decision'] == 'allow'
+    before = len(c.writes)
+    assert not (await c.probe('api'))['success']
+    assert (await publish('farewell'))['status'] == '发布失败'
+    if has_work: assert not (await work())['available']
+    assert len(c.writes) == before
+    c.cases.append('farewell_scopes_reply_and_defers_third_party_actions')
     gap=await c.call(WEAVE,'acceptance_expire_wake')
     assert gap['internal_sleeping'] and not gap['status']['sleeping']
     assert gap['status']['current'] is None and gap['status']['awake_until'] is None

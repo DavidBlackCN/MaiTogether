@@ -28,6 +28,7 @@ def main():
     import pytest
     names = ('test_life_status.py', 'test_nap_quiet.py', 'test_sleep_policy.py',
              'test_webui.py', 'test_reading_rhythm.py', 'test_qzone.py',
+             'test_farewell.py', 'test_private_wake.py', 'test_chat_schedule.py',
              'test_proactive_modes.py', 'test_proactive_followup.py', 'test_plugin.py')
     return pytest.main([str(Path(__file__).with_name('test_source.py')),
         *[str(source / 'tests' / name) for name in names], '-q',
