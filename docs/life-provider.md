@@ -7,7 +7,7 @@ MaiTogether 读取生活状态，只决定是否允许对外动作，不管理�
 ## 模块
 
 - `life.py`：选择已注册 API，检查版本、可见性、超时和返回值。
-- `life_status.py`：解释 MaiWeave v1 状态；同一文件随 MaiWork 适配构建。
+- `life_status.py`：Host 和 MaiWork 共用的查询与判断。平时只查一次生活状态。临时唤醒期间，主动动作还要确认麦麦是否正在告别；普通聊天的晚安回复由 MaiWeave 按会话处理。
 - `runtime.py`：结合生活、Hush 静音及 Identity 管理权限，在发送前决定是否继续。
 
 Host 使用 `social` 查询；MaiWork 的共享解析器还支持 `work`，用于判断是否开始新任务。状态查询不是发送授权。

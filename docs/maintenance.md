@@ -2,7 +2,7 @@
 
 普通安装见[安装与设置](setup.md)。本页供维护者更新补丁、构建和测试。
 
-当前配套使用 Host 1.4.8、SDK 2.23.0、QQ 连接器 1.3.3，MaiTogether 修改版本为 0.7.1。准确提交见 [baseline.json](../baseline.json)。
+当前配套使用 Host 1.4.8、SDK 2.23.0、QQ 连接器 1.3.3，MaiTogether 修改版本为 0.7.2。准确提交见 [baseline.json](../baseline.json)。
 
 ## 目录
 

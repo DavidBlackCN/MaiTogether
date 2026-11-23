@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import asyncio
 
 from .context import provider_request
-from .life_status import WEAVE_PLUGIN, WEAVE_API, evaluate_status, wake_decision
+from .life_status import WEAVE_PLUGIN, WEAVE_API, read_maiweave
 
 
 @dataclass(frozen=True)
@@ -71,18 +71,13 @@ class LifeProvider:
 
         token = provider_request.set(request)
         try:
-            status = await query(self.api, {})
             if self.protocol == 'decision_v1':
-                return validate_result(status)
-            result = evaluate_status(status, 'social', max_age_seconds=self.max_age_seconds)
+                return validate_result(await query(self.api, {}))
             # MaiWeave's send hook already limits ordinary Host replies to the farewell chat.
             host_reply = (request.get('origin', {}).get('kind') == 'host'
                           and request.get('action') in ('platform.message', 'send_msg', 'send_private_msg', 'send_group_msg')
                           and bool(request.get('message_id')))
-            if result['decision'] == 'allow' and status['awake_until'] and not host_reply:
-                behavior = await query('evaluate_behavior', {'behavior': 'proactive'})
-                return wake_decision(behavior, status, 'social', self.max_age_seconds)
-            return result
+            return await read_maiweave(query, 'social', max_age_seconds=self.max_age_seconds, host_reply=host_reply)
         finally:
             provider_request.reset(token)
 

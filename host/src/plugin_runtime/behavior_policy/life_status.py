@@ -94,8 +94,14 @@ Each caller obtains a fresh response; this function does not cache permissions.
     return {**result, 'decision': 'allow', 'reason': 'available'}
 
 
-def wake_decision(behavior, status, category, max_age_seconds):
-    """Temporary waking includes a farewell phase reserved for the ordinary reply."""
+async def read_maiweave(query, category, *, max_age_seconds, host_reply=False):
+    """During temporary waking, reserve the farewell for the ordinary Host reply."""
+    status = await query(WEAVE_API, {})
+    result = evaluate_status(status, category, max_age_seconds=max_age_seconds)
+    if result['decision'] != 'allow' or host_reply or not status['awake_until']:
+        return result
+
+    behavior = await query('evaluate_behavior', {'behavior': 'proactive'})
     unknown = {'version': 1, 'decision': 'deny', 'reason': 'state_unknown'}
     if (not isinstance(behavior, dict) or type(behavior.get('version')) is not int
             or behavior['version'] != 1 or behavior.get('behavior') != 'proactive'):
@@ -107,5 +113,6 @@ def wake_decision(behavior, status, category, max_age_seconds):
     except (ValueError, TypeError, KeyError, OverflowError):
         return unknown
     if behavior.get('decision') == 'allow' and behavior.get('reason') == 'available':
+        # The wake window or current activity may have ended during the second call.
         return evaluate_status(status, category, max_age_seconds=max_age_seconds)
     return {**unknown, 'reason': 'farewell' if behavior.get('reason') == 'farewell' else 'state_unknown'}

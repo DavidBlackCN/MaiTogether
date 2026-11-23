@@ -1,6 +1,6 @@
 # 补丁范围
 
-MaiTogether 修改 **8 个 Host 官方文件、5 个 QQ 连接器官方文件**，不修改 SDK。新增逻辑集中在本项目模块，官方聊天、回复生成和记忆代码保持原样。
+MaiTogether 修改 **7 个 Host 官方文件、5 个 QQ 连接器官方文件**。调用来源、生活状态和权限判断由 MaiTogether 自己的模块处理。
 
 ## Host
 
@@ -11,8 +11,7 @@ MaiTogether 修改 **8 个 Host 官方文件、5 个 QQ 连接器官方文件**�
 | `plugin_runtime/capabilities/registry.py` | 注册发送检查及发送结果接口 |
 | `plugin_runtime/host/capability_service.py` | 校验调用来源，附带发送结果 |
 | `plugin_runtime/host/supervisor.py` | 记录一次真实调用的起止 |
-| `plugin_runtime/runner/rpc_client.py` | 在 Runner 中接收调用信息 |
-| `plugin_runtime/runner/runner_main.py` | 回传 Host 分配的调用引用 |
+| `plugin_runtime/runner/runner_main.py` | 注册请求时接入 Host 的调用信息，插件调用能力时回传本次引用 |
 | `plugin_runtime/component_query.py` | 从命令和工具入口记录发送者、目标会话 |
 | `platform_io/manager.py` | 检查标准消息发送 |
 | `plugin_runtime/host/hook_dispatcher.py` | Hook 熔断时报告失败，不能当作检查成功 |
@@ -24,9 +23,9 @@ Host 判断谁发起动作、发往哪里。插件参数中的 `is_owner` 等字
 | 文件 | 作用 |
 | --- | --- |
 | `_manifest.json` | 声明检查所需能力 |
-| `plugin.py` | 创建检查服务 |
-| `runtime_state.py` | 保存检查服务 |
-| `services/action_service.py` | 预检查批量操作并记录逐项结果 |
+| `plugin.py` | 创建检查服务，预检查批量操作并返回已完成的数量 |
+| `runtime_state.py` | 向 Host 报告当前连接编号和支持的检查接口版本 |
+| `services/action_service.py` | 收到 QQ 回应后，结合投递确认记录动作结果 |
 | `transport.py` | 排队结束、实际写入 WebSocket 前检查 |
 
 批量预检查不生成发送票据，也不扣静音额度。每个实际子动作单独检查，因此生成中入睡、排队期间静音也能阻止尚未提交的动作。已提交请求允许收尾，未知结果不自动重发。

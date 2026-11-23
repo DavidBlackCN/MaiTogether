@@ -1,8 +1,8 @@
 {
   "repository": "https://github.com/ilworkcn/MaiWeave",
   "branch": "main",
-  "commit": "f56b954edbb6090a50df27d58e5ab4d05c20a55c",
-  "version": "0.12.6",
+  "commit": "9f39457bab227f71ee74f1108aae36308864610e",
+  "version": "0.12.7",
   "api": "get_life_status",
   "api_version": "1",
   "required_fields": [

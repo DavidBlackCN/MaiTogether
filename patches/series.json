@@ -12,12 +12,12 @@
           "src/plugin_runtime/capabilities/registry.py",
           "src/plugin_runtime/host/capability_service.py",
           "src/plugin_runtime/host/supervisor.py",
-          "src/plugin_runtime/runner/rpc_client.py",
           "src/plugin_runtime/runner/runner_main.py"
         ],
         "modules": [
           "src/plugin_runtime/behavior_policy/actions.py",
           "src/plugin_runtime/behavior_policy/context.py",
+          "src/plugin_runtime/behavior_policy/runner.py",
           "src/plugin_runtime/behavior_policy/runtime.py",
           "src/plugin_runtime/behavior_policy/life.py",
           "src/plugin_runtime/behavior_policy/life_status.py",
