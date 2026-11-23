@@ -9,7 +9,7 @@
 - **日常生活**：MaiWeave 提供日程、活动、睡眠和主动交流，让生活经历接上日常聊天。
 - **身份与权限**：MaiIdentity 配置固定身份和管理员。亲昵称呼不等于管理权限。
 - **保持安静**：MaiHush 管理群静音，配合发送检查约束消息、戳一戳和表情回应。
-- **工作任务**：[MaiWork 配套适配](docs/plugins/maiwork.md)，保留其任务、Agent、Skill 和工作台，并接入生活状态、管理员查询和完整发送回执。
+- **工作任务**：[MaiWork](docs/plugins/maiwork.md) 在后台处理任务，支持多 Agent、Skill 和文件交付，每个服务群可以指定自己的审批人。
 - **扩展能力**：按需搭配社区插件。通过标准发送或配套 QQ 连接器执行的动作，可以共用睡眠和静音检查。
 
 生活和主动交流的设置见 [MaiWeave 配置](docs/plugins/maiweave.md)，搜索、回复优化等插件见[插件清单](docs/plugins.md)。

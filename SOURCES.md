@@ -1,31 +1,15 @@
 # 来源与许可证
 
-本项目基于以下官方源码。构建使用固定提交，完整版本记录见 [baseline.json](baseline.json)。
+## MaiBot 官方项目
 
-| 项目 | 版本 | 本项目的处理 |
-| --- | --- | --- |
-| [MaiBot](https://github.com/Mai-with-u/MaiBot) | 1.4.8 | 保存真实调用来源，检查对外动作的生活状态、静音和权限 |
-| [Plugin SDK](https://github.com/Mai-with-u/maibot-plugin-sdk) | 2.23.0 | 使用原版，没有修改 |
-| [QQ 连接器](https://github.com/Mai-with-u/MaiBot-SnowLuma-Adapter) | 1.3.3 | 在实际发送前再次检查状态，分别处理批量动作的结果 |
+MaiTogether 的补丁用于 [MaiBot Host](https://github.com/Mai-with-u/MaiBot) 和 [SnowLuma QQ 连接器](https://github.com/Mai-with-u/MaiBot-SnowLuma-Adapter)，插件使用官方 [Plugin SDK](https://github.com/Mai-with-u/maibot-plugin-sdk)。构建所用的版本和提交见[构建版本记录](baseline.json)。
 
-社区插件回归使用以下原版源码：
+- MaiTogether 新增的补丁和模块采用 GPL-3.0-or-later。见[项目许可证](LICENSE)。
+- MaiBot Host 的上游许可证保存在 [Host-LICENSE](licenses/Host-LICENSE)。
+- SnowLuma QQ 连接器在插件清单中声明 GPL-v3.0-or-later。仓库附有 [GPL 第 3 版全文](licenses/GPL-3.0.txt)。
 
-- [Smart Poke 1.11.1](https://github.com/TAIY2020/smart_poke_plugin/tree/59ff292b4d912a5cbe5d09cce32381e8497d350f)。
-- [Smart Poke 1.13.0](https://github.com/TAIY2020/smart_poke_plugin/tree/df29e929bde938789360569a27fb1171f40325cd)。
-- [Cateye 表情回应 0.3.2](https://github.com/cateyemizuki/cateye_set_msg_emoji_like_api_modify/tree/f239878a3eb217fa4730fb9569c2277de4beaa01)。
-- [Cateye 消息后处理 1.4.5，Host 1.4 分支](https://github.com/cateyemizuki/cateye_better_post-processing/tree/18652c37dba6fc0340a393daaf636faa901fb3a3)。
-- [智能分段 1.1.0](https://github.com/HaoxiangXia/smart_segmentation_plugin/tree/db9dd69cc37856841aa60a2724e3181cfe65b65e)。
+## 社区插件
 
-[MaiWeave 0.12.7](https://github.com/ilworkcn/MaiWeave/tree/9f39457bab227f71ee74f1108aae36308864610e) 使用上游原版源码及 GPL-3.0-only 许可证；接口与测试记录见 [integrations/maiweave](integrations/maiweave/README.md)。生活引擎的选用和配置见 [MaiWeave](docs/plugins/maiweave.md)。
+生活引擎采用 [MaiWeave](https://github.com/ilworkcn/MaiWeave)（GPL-3.0-only），后台任务采用 [MaiWork](https://github.com/CharTyr/MaiWork)（AGPL-3.0-or-later）。两者均使用上游原版，打包和联测所用的提交见[社区插件版本记录](locks/community-plugins.json)。
 
-其他插件的来源见[插件清单](docs/plugins.md)，各自保留原作者和许可证。
-
-[MaiWork 0.17.1](https://github.com/CharTyr/MaiWork/tree/30ea5a4561cf85fcd81defce66ca36e11de36de4) 的配套适配位于 [integrations/maiwork](integrations/maiwork/README.md)。构建保留上游 AGPL-3.0-or-later 许可证、插件 ID 和作者信息；MaiWork 适配补丁与新增模块也按 AGPL-3.0-or-later 提供。
-
-## 许可证
-
-Host 上游附 GPL 第 3 版许可证，原文保存在 [licenses/Host-LICENSE](licenses/Host-LICENSE)。
-
-QQ 连接器的固定提交没有单独的 LICENSE 文件，其 Manifest 声明为 GPL-v3.0-or-later。本项目保留原 Manifest 和作者信息，并附上 [GPL 第 3 版全文](licenses/GPL-3.0.txt)。
-
-Host／连接器新增的补丁和模块以 **GPL-3.0-or-later** 提供；社区插件适配按上述各自许可证提供，不改变上游文件的作者和权利归属。
+其他插件的用途和上游仓库见[插件清单](docs/plugins.md)。随包分发的插件保留原作者署名与许可证。

@@ -2,7 +2,7 @@
 from pathlib import Path
 import argparse
 import hashlib
-import importlib.util
+from community_source import copy_reviewed
 import json
 import shutil
 import subprocess
@@ -28,15 +28,11 @@ def main():
     p.add_argument('--output',type=Path,required=True)
     p.add_argument('--host-source',type=Path,help='Official Host Git checkout containing the locked commit')
     p.add_argument('--adapter-source',type=Path,help='Official adapter Git checkout containing the locked commit')
-    p.add_argument('--maiwork-source',type=Path,help='Include the pinned MaiWork adaptation')
+    p.add_argument('--maiwork-source',type=Path,help='Include original MaiWork from the reviewed checkout')
     p.add_argument('--maiweave-source',type=Path,help='Include the reviewed MaiWeave source')
     a=p.parse_args()
     root=a.workspace.resolve();out=a.output.resolve()
     baseline=json.loads((CONTROL/'baseline.json').read_text(encoding='utf-8'))
-    if a.maiwork_source:
-        work_pin=json.loads((CONTROL/'integrations/maiwork/baseline.json').read_text(encoding='utf-8'))
-        if work_pin['host'] != baseline['host']['tag'].removeprefix('v'):
-            raise ValueError('MaiWork adaptation has not been validated on this Host baseline')
     archive=out.with_name(out.name+'.zip')
     if out.exists() or archive.exists():raise ValueError('Delivery output must not exist')
     out.mkdir(parents=True)
@@ -53,17 +49,9 @@ def main():
         copy_files(source,out/'plugins'/folder,names)
         pins[folder]={'commit':git(source,'rev-parse','HEAD').decode().strip(),
                       'version':json.loads((source/'_manifest.json').read_text(encoding='utf-8'))['version']}
-    if a.maiweave_source:
-        source=a.maiweave_source.resolve()
-        spec=importlib.util.spec_from_file_location('weave_source',CONTROL/'integrations/maiweave/source.py')
-        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-        pins['MaiWeave']=module.verify(source)
-        copy_files(source,out/'plugins/MaiWeave',tracked_files(source))
-    if a.maiwork_source:
-        spec=importlib.util.spec_from_file_location('maiwork_build',CONTROL/'integrations/maiwork/build.py')
-        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-        module.build(a.maiwork_source,out/'plugins/MaiWork')
-        pins['MaiWork']=json.loads((CONTROL/'integrations/maiwork/baseline.json').read_text(encoding='utf-8'))
+    for name, source in [('MaiWeave', a.maiweave_source), ('MaiWork', a.maiwork_source)]:
+        if source:
+            pins[name] = copy_reviewed(source, name, out / 'plugins' / name)
     shutil.copytree(CONTROL,out/'maintenance',ignore=shutil.ignore_patterns('__pycache__','*.pyc','.git','.pytest_cache'))
     (out/'core-versions.json').write_text(json.dumps(pins,indent=2)+'\n',encoding='utf-8')
     version=json.loads((CONTROL/'baseline.json').read_text(encoding='utf-8'))['adaptation_version']

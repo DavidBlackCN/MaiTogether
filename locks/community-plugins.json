@@ -1,0 +1,12 @@
+{
+  "MaiWeave": {
+    "repository": "https://github.com/ilworkcn/MaiWeave",
+    "commit": "9f39457bab227f71ee74f1108aae36308864610e",
+    "version": "0.12.7"
+  },
+  "MaiWork": {
+    "repository": "https://github.com/CharTyr/MaiWork",
+    "commit": "30ea5a4561cf85fcd81defce66ca36e11de36de4",
+    "version": "0.17.1"
+  }
+}

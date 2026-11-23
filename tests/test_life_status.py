@@ -1,4 +1,4 @@
-"""MaiWeave state boundaries shared by Host and work admission."""
+"""MaiWeave state boundaries for outgoing social actions."""
 from datetime import datetime, timezone
 from copy import deepcopy
 import pytest
@@ -18,14 +18,14 @@ def status(kind='leisure', **values):
         'current': {'id': 'activity', 'kind': kind, 'status': 'scheduled',
                     'start': iso(-60), 'end': iso(60)} if kind else None, **values}
 
-@pytest.mark.parametrize('kind,category,reason', [
-    ('leisure','social','available'), ('sleep','social','sleeping'),
-    ('work','social','busy'), ('study','work','busy'), ('travel','social','busy'),
-    ('work','work','busy'), (None,'social','available'),
+@pytest.mark.parametrize('kind,reason', [
+    ('leisure','available'), ('sleep','sleeping'),
+    ('work','busy'), ('study','busy'), ('travel','busy'),
+    (None,'available'),
 ])
-def test_activity_rules(kind, category, reason):
+def test_activity_rules(kind, reason):
     value=status(kind); original=deepcopy(value)
-    r=evaluate_status(value, category, now=NOW)
+    r=evaluate_status(value, now=NOW)
     assert r['reason'] == reason
     assert r['decision'] == ('allow' if reason == 'available' else 'deny')
     assert value==original
@@ -61,18 +61,18 @@ def test_activity_rules(kind, category, reason):
     (status(awake_until='bad'), 'state_unknown'),
 ])
 def test_sleep_and_health_boundaries(value, reason):
-    assert evaluate_status(value, 'social', now=NOW)['reason']==reason
+    assert evaluate_status(value, now=NOW)['reason']==reason
 
 @pytest.mark.parametrize('field', ['version','ready','enabled','schedule_enabled','updated_at','queried_at',
                                  'sleeping','effective_sleeping','sleep_until','awake_until','current','next_plan'])
 def test_missing_fields_never_allow(field):
     value=status(); del value[field]
-    assert evaluate_status(value,'social',now=NOW)['decision']=='deny'
+    assert evaluate_status(value,now=NOW)['decision']=='deny'
 
 @pytest.mark.parametrize('field,value', [('kind','new_kind'),('status','completed'),('id',''),('end',iso()),('start',iso(1))])
 def test_unknown_or_expired_activity(field,value):
     s=status();s['current'][field]=value
-    assert evaluate_status(s,'work',now=NOW)['decision']=='deny'
+    assert evaluate_status(s,now=NOW)['decision']=='deny'
 
 @pytest.mark.asyncio
 async def test_public_state_is_only_accepted_with_explicit_official_protocol():

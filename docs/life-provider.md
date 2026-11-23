@@ -7,10 +7,10 @@ MaiTogether 读取生活状态，只决定是否允许对外动作，不管理�
 ## 模块
 
 - `life.py`：选择已注册 API，检查版本、可见性、超时和返回值。
-- `life_status.py`：Host 和 MaiWork 共用的查询与判断。平时只查一次生活状态。临时唤醒期间，主动动作还要确认麦麦是否正在告别；普通聊天的晚安回复由 MaiWeave 按会话处理。
+- `life_status.py`：读取生活状态。临时唤醒期间，主动动作还要确认麦麦是否正在告别；普通聊天的晚安回复由 MaiWeave 按会话处理。
 - `runtime.py`：结合生活、Hush 静音及 Identity 管理权限，在发送前决定是否继续。
 
-Host 使用 `social` 查询；MaiWork 的共享解析器还支持 `work`，用于判断是否开始新任务。状态查询不是发送授权。
+Host 在 QQ 发送前查询生活状态。MaiWork 的后台任务按自己的设置运行。
 
 ## MaiWeave v1
 
@@ -32,7 +32,7 @@ Host 使用 `social` 查询；MaiWork 的共享解析器还支持 `work`，用�
 
 使用 MaiWeave 0.11.3 新增的 `effective_sleeping`、`sleep_until` 和 `queried_at`。每次发送检查重新查询，检查就绪状态、活动时段、临时唤醒与睡眠截止时间。缺少必要字段、结果过期或时间边界已变化时拒绝。
 
-`queried_at` 用于结果有效期检查，`updated_at` 记录精力、心情与位置等保存状态的更新时间。实际睡眠由 `effective_sleeping` 决定，正常空闲可以放行。Host 的社交动作和 MaiWork 的新任务仍在工作、学习、出行时暂停。
+`queried_at` 是本次查询时间，`updated_at` 是身体与位置等数据的保存时间。Host 根据 `effective_sleeping` 判断实际睡眠，工作、学习和出行期间也会暂停受管社交动作。
 
 MaiWeave 同时提供公开的 `evaluate_behavior(behavior="conversation" | "proactive")`。它的对话规则允许部分午睡回复，主动规则的活动范围也与本项目有所不同。当前接入继续读取 `get_life_status`，执行统一的实际睡眠与忙碌限制。具体行为见 [MaiWeave 页面](plugins/maiweave.md#状态判断)。
 

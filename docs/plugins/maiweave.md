@@ -1,6 +1,6 @@
 # MaiWeave
 
-[上游项目](https://github.com/ilworkcn/MaiWeave) · [接口与维护测试](../../integrations/maiweave/README.md)
+[上游项目](https://github.com/ilworkcn/MaiWeave) · [生活状态接口](../life-provider.md)
 
 ## 简介
 
@@ -42,4 +42,4 @@ MaiTogether 在实际睡眠期间统一暂停发送，包括午睡。MaiWeave �
 
 每次发送检查都会重新查询，默认接受 180 秒内的查询结果。精力、心情等数据的保存时间可以较早。活动结束、唤醒到期或下一项活动开始时，旧查询结果会失效。
 
-接口约定与已核验提交见[维护记录](../../integrations/maiweave/README.md)。MaiWeave 可独立更新；若公开状态接口发生变化，MaiTogether 会暂停受影响动作，需重新核验接口。维护测试见[维护说明](../maintenance.md)。
+MaiWeave 可以独立更新。若公开状态接口发生变化，MaiTogether 会暂停受影响的动作。已验证的上游提交见[版本记录](../../locks/community-plugins.json)。

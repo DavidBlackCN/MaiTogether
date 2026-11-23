@@ -9,7 +9,6 @@ VITA='davidblackcn.maibot-maivita-plugin'
 COORD='davidblackcn.maibot-maicoordinate-plugin'
 
 WEAVE='ilworkcn.maiweave'
-WORK='chartyr.maiwork'
 
 
 async def run_cases(values):
@@ -65,9 +64,6 @@ async def run_cases(values):
     policy.targets.append({'platform': 'qq', 'account_id': '123456789', 'scope': None,
         'chat_type': 'space', 'target_id': '123456789', 'providers': ['life'],
         'autonomous_plugins': [WEAVE], 'cross_target_plugins': [WEAVE]})
-    async def work(mode='available',**kwargs):
-        return await c.call(WORK,'acceptance_probe',dict(mode=mode,stream_id=c.stream,**kwargs))
-    has_work=os.environ.get('MAIWORK_TEST')=='1'
     assert (await decision())['decision']=='allow'
     if policy.behavior_enabled:
         assert await c.probe()
@@ -91,11 +87,18 @@ async def run_cases(values):
         del c.faults['client']
     c.cases.append('napcat_diary_cannot_read_account_cookies')
     await seed(kind='sleep'); n = len(c.writes)
+    if os.environ.get('MAIWORK_TEST') == '1':
+        from maiwork_native import check_paused_reply
+        await check_paused_reply(c, '-803')
+        c.cases.append('original_maiwork_processes_command_asleep_without_qq_output')
     result = await publish('sleep')
     assert result['status'] == '发布失败' and 'life:sleeping' in result['error'], result
     assert len(c.writes) == n
     await seed()
     assert (await c.command('/maihush mute 5m'))[0]
+    if os.environ.get('MAIWORK_TEST') == '1':
+        await check_paused_reply(c, '-804')
+        c.cases.append('original_maiwork_reply_blocked_in_muted_group')
     assert (await publish('group-muted'))['status'] == '已发布'
     assert (await c.command('/maihush unmute'))[0]
     c.faults['drop'] = 'send_qzone_msg'
@@ -121,29 +124,6 @@ async def run_cases(values):
     assert len(c.writes) == n
     await seed()
     c.cases.append('upstream_share_generation_sleep_race_blocked_before_submission')
-    if has_work:
-        assert (await work())['available']
-        assert (await work('model'))['ok']
-        assert not (await work('publish'))['allowed']
-        assert (await work('send'))['state']=='confirmed'
-        assert (await work('file'))['file_id'] == 'fixture-file'
-        c.faults['drop'] = 'send_msg'; n = len(c.writes)
-        assert (await work('outbox', key='work-unknown'))['status'] == 'uncertain'
-        c.faults['drop'] = None
-        await work('flush')
-        assert len(c.writes) == n + 1
-        from src.common.utils.utils_message import MessageUtils
-        message = c.raw('/mw 批准 R-fixture')
-        await MessageUtils.store_message_to_db_async(message)
-        args = {'mid': message.message_id, 'raw': message.processed_plain_text}
-        assert (await work('admin', user_id='10001', **args))['allowed']
-        assert not (await work('admin', user_id='10003', **args))['allowed']
-        allowed = await work('approval', user_id='10001', **args)
-        denied = await work('approval', user_id='10003', **args)
-        assert '没找到请求' in allowed['reply'] and '只有配置的任务管理员' in denied['reply'], (allowed, denied)
-        c.cases.append('maiwork_status_model_and_delivery_without_vita')
-        c.cases.append('maiwork_file_unknown_receipt_and_real_identity_approval')
-
     for kind,reason in [('work','busy'),('study','busy'),('travel','busy'),('sleep','sleeping')]:
         await seed(kind=kind)
         assert (await decision('social'))['reason']==reason
@@ -152,24 +132,7 @@ async def run_cases(values):
             assert not (await c.probe('api'))['success']
             await c.tool('emoji_like',{'stream_id':c.stream,'target_message_id':'-999','emoji':'128512'})
             assert len(c.writes)==n
-        if has_work: assert not (await work())['available']
     c.cases.append('work_study_travel_and_sleep_block_social')
-    if has_work:
-        await seed()
-        c.faults.update(hold_model=True,model_started=asyncio.Event(),model_release=asyncio.Event())
-        pending=asyncio.create_task(work('generate_send'))
-        try:
-            await asyncio.wait_for(c.faults['model_started'].wait(),3)
-            await seed(kind='sleep')
-        finally:
-            c.faults['model_release'].set();c.faults['hold_model']=False
-        assert (await pending)['state']=='deferred'
-        count=len(c.model_calls)
-        assert not (await work('model'))['ok'] and len(c.model_calls)==count
-        row=await work('outbox',key='weave-sleep')
-        assert row['status']=='pending' and row['attempts']==0
-        c.cases.append('maiwork_generation_sleep_race_and_new_model_guard')
-
     # Native reception hook can wake without a model.
     await seed(kind='sleep')
     await c.call(WEAVE,'acceptance_person',{'stream_id':c.stream,'user_id':'10001'})
@@ -186,7 +149,6 @@ async def run_cases(values):
     before = len(c.writes)
     assert not (await c.probe('api'))['success']
     assert (await publish('farewell'))['status'] == '发布失败'
-    if has_work: assert not (await work())['available']
     assert len(c.writes) == before
     c.cases.append('farewell_scopes_reply_and_defers_third_party_actions')
     gap=await c.call(WEAVE,'acceptance_expire_wake')
@@ -200,7 +162,6 @@ async def run_cases(values):
     assert not (await c.probe('api'))['success']
     await c.tool('react_emoji',{'message_id':'-999','emoji_id':128512})
     assert len(c.writes)==n
-    if has_work: assert not (await work())['available']
     c.cases.append('expired_real_wake_reports_effective_sleep_and_blocks_actions')
     await seed(kind=None)
     assert (await decision())['decision']=='allow'
@@ -210,14 +171,12 @@ async def run_cases(values):
     c.cases.append('scheduled_idle_and_all_day_idle_allowed')
     await seed(age=86400)
     assert (await decision())['decision']=='allow'
-    if has_work: assert (await work())['available']
     c.cases.append('fresh_query_remains_valid_when_stored_body_state_is_old')
     await seed()
     if policy.behavior_enabled:
         assert (await c.command('/maihush mute 5m'))[0]
         n=len(c.writes)
         assert not await c.probe()
-        if has_work: assert (await work('send'))['state']=='deferred'
         assert len(c.writes)==n
         assert (await c.command('/maihush unmute'))[0]
         c.cases.append('hush_and_identity_command_authorization_retained')
@@ -260,7 +219,6 @@ async def run_cases(values):
     try: await decision()
     except RuntimeError: pass
     else: raise AssertionError('unloaded life allowed')
-    if has_work: assert not (await work())['available']
     assert await c.supervisor.reload_plugins([WEAVE],reason='life-reload')
     assert (await decision())['decision']=='allow'
     c.cases.append('configuration_reload_unload_and_restart_fail_closed')

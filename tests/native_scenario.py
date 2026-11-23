@@ -56,17 +56,7 @@ async def run(work):
                 if faults['drop']==action: continue
             await ws.send_json({'status':'ok','retcode':0,'data':data,'echo':body['echo']})
         return ws
-    model_calls=[]
-    async def work_model(request):
-        model_calls.append(await request.json())
-        if faults.get('hold_model'):
-            faults['model_started'].set()
-            await faults['model_release'].wait()
-        return web.json_response({'id':'fixture','model':'fixture','choices':[{'index':0,
-            'message':{'role':'assistant','content':'fixture result'},'finish_reason':'stop'}],
-            'usage':{'prompt_tokens':3,'completion_tokens':2,'total_tokens':5}})
     app=web.Application(); app.router.add_get('/',ws_handler)
-    if os.environ.get('MAIWORK_TEST')=='1': app.router.add_post('/v1/chat/completions',work_model)
     server=web.AppRunner(app); await server.setup()
     site=web.TCPSite(server,'127.0.0.1',0); await site.start()
     port=site._server.sockets[0].getsockname()[1]
@@ -91,7 +81,7 @@ async def run(work):
     }
     if os.environ.get('MAIWORK_TEST')=='1':
         from maiwork_native import configure
-        configure(work, configs, port)
+        configure(work, configs)
     if weave:
         configs['maiweave'] = {'plugin': {'enabled': True, 'config_version': '0.12.7'},
             'life': {'enabled': True, 'autonomous': False, 'model_task': 'test'},
@@ -100,7 +90,6 @@ async def run(work):
             'context': {'people': False}}
         if os.environ.get('MAIWEAVE_SMOKE') == '1':
             configs['maiweave']['life']['schedule_enabled'] = False
-        if 'maiwork' in configs: configs['maiwork']['together']['life_provider'] = 'maiweave'
     if os.environ.get('POST_PROCESSING_TEST') == '1':
         configs['post_processing'] = {'plugin': {'enabled': True, 'config_version': '1.4.5'},
             'response_splitter': {'enable': '关闭', 'yield_to_other_plugins': True, 'final_newline_action': '保持原样'},
@@ -190,6 +179,9 @@ async def run(work):
                 from weave_smoke import run_cases
             else:
                 from weave_native import run_cases
+            if 'maiwork' in configs:
+                from maiwork_native import check_commands
+                await check_commands(locals())
             await run_cases(locals())
             return
         assert {LIFE,HUSH,IDENTITY,ADAPTER,POKE,CATEYE,PROBE} <= set(supervisor._registered_plugins),supervisor._registered_plugins

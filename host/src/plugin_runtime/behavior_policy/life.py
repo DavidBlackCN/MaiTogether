@@ -77,7 +77,7 @@ class LifeProvider:
             host_reply = (request.get('origin', {}).get('kind') == 'host'
                           and request.get('action') in ('platform.message', 'send_msg', 'send_private_msg', 'send_group_msg')
                           and bool(request.get('message_id')))
-            return await read_maiweave(query, 'social', max_age_seconds=self.max_age_seconds, host_reply=host_reply)
+            return await read_maiweave(query, max_age_seconds=self.max_age_seconds, host_reply=host_reply)
         finally:
             provider_request.reset(token)
 

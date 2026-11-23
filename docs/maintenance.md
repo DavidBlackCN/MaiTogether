@@ -2,7 +2,7 @@
 
 普通安装见[安装与设置](setup.md)。本页供维护者更新补丁、构建和测试。
 
-当前配套使用 Host 1.4.8、SDK 2.23.0、QQ 连接器 1.3.3，MaiTogether 修改版本为 0.7.2。准确提交见 [baseline.json](../baseline.json)。
+当前配套使用 Host 1.4.8、SDK 2.23.0、QQ 连接器 1.3.3，MaiTogether 修改版本为 0.7.3。准确提交见 [baseline.json](../baseline.json)。
 
 ## 目录
 
@@ -11,7 +11,7 @@
 | `host/`、`adapter/` | 本项目新增模块，不是完整安装目录 |
 | `patches/` | 对官方文件的修改；`series.json` 列出修改范围 |
 | `locks/` | 完整 Host 和连接器的两份文件校验清单 |
-| `integrations/` | MaiWeave 的接口与测试记录；MaiWork 的适配补丁和构建工具 |
+| [社区插件版本](../locks/community-plugins.json) | 打包和联测使用的 MaiWeave、MaiWork 上游提交 |
 | `tools/`、`tests/` | 安装、构建、升级和验证工具 |
 | `docs/plugins/` | 每个选用插件的版本、配置和搭配说明 |
 
@@ -67,7 +67,7 @@ python tools/run_native.py --life-provider --workspace .. --host ../control-buil
 
 `--native-chat` 检查消息仍进入官方聊天、记忆处理入口，同时睡眠会阻止对外动作。它不验证真实模型的理解与生成效果。
 
-MaiWeave 完整组合另传 `--maiweave <上游原版源码>`；加 `--maiweave-smoke` 可单独检查未经测试入口改写的原版加载。工作联动再加 `--maiwork <已构建适配>`。接口测试与构建方法分别见 [MaiWeave](../integrations/maiweave/README.md) 和 [MaiWork](../integrations/maiwork/README.md)。MaiWeave 检查干净上游提交，MaiWork 另检查补丁和文件哈希。先审查 MaiWeave 当时默认分支最新源码并更新准确提交记录，不把旧版本结果套用到新版本。Host 回归不等于完整组合通过。
+联测时传入 `--maiweave <原版源码目录>` 和可选的 `--maiwork <原版源码目录>`。加 `--maiweave-smoke` 可用未经测试探针改写的 MaiWeave 检查加载与公开 API。MaiWork 始终使用原版。升级时先审查上游最新提交，更新 [社区插件版本](../locks/community-plugins.json)，再用干净检出运行联测。MaiWeave 上游接口测试可用 `python tools/test_maiweave.py --source <原版源码目录> --output <新目录>` 单独运行。
 
 同时验证消息后处理与智能分段时，再传 `--post-processing <Cateye源码> --segmentation <智能分段源码>`，测试配置会关闭 Cateye 分段。
 
@@ -83,7 +83,7 @@ MaiWeave 完整组合另传 `--maiweave <上游原版源码>`；加 `--maiweave-
 python tools/export_patches.py --host-source ../upstream/MaiBot --adapter-source ../upstream/MaiBot-SnowLuma-Adapter --host-working ../working/host --adapter-working ../working/adapter --output ../rebuilt
 ```
 
-导出会更新补丁和校验值，随后重新回归。可用 `tools/package.py` 打包源码；它要求核心插件仓库干净，并检查可选 MaiWeave、MaiWork 的版本记录。MaiWork 组合尚未匹配当前 Host 时不能强行打包。
+导出会更新补丁和校验值，随后重新回归。`tools/package.py` 可用 `--maiweave-source` 和 `--maiwork-source` 将审查过的原版源码随包分发。
 
 ## 更新与恢复
 

@@ -1,4 +1,4 @@
-"""Pure MaiWeave v1 interpretation, also bundled into the MaiWork adaptation.
+"""MaiWeave v1 state checks for outgoing social actions.
 
 This is an advisory life condition, never an authorization or a send ticket.
 No model, storage, network, activity history or inferred sleep schedule lives here.
@@ -21,7 +21,7 @@ def timestamp(value):
     return result.timestamp()
 
 
-def evaluate_status(status, category, *, max_age_seconds=180, now=None):
+def evaluate_status(status, *, max_age_seconds=180, now=None):
     """Read effective sleep from MaiWeave's own life rules.
 
 queried_at dates the decision; updated_at dates stored energy, mood and location.
@@ -30,8 +30,7 @@ Each caller obtains a fresh response; this function does not cache permissions.
     result = {'version': 1, 'decision': 'deny', 'reason': 'state_unknown'}
     def deny(reason):
         return {**result, 'reason': reason}
-    if (category not in ('social', 'work')
-            or type(max_age_seconds) is not int or not 10 <= max_age_seconds <= 3600):
+    if type(max_age_seconds) is not int or not 10 <= max_age_seconds <= 3600:
         return deny('invalid_life_query')
     if (not isinstance(status, dict) or type(status.get('version')) is not int
             or status['version'] != 1):
@@ -94,10 +93,10 @@ Each caller obtains a fresh response; this function does not cache permissions.
     return {**result, 'decision': 'allow', 'reason': 'available'}
 
 
-async def read_maiweave(query, category, *, max_age_seconds, host_reply=False):
+async def read_maiweave(query, *, max_age_seconds, host_reply=False):
     """During temporary waking, reserve the farewell for the ordinary Host reply."""
     status = await query(WEAVE_API, {})
-    result = evaluate_status(status, category, max_age_seconds=max_age_seconds)
+    result = evaluate_status(status, max_age_seconds=max_age_seconds)
     if result['decision'] != 'allow' or host_reply or not status['awake_until']:
         return result
 
@@ -114,5 +113,5 @@ async def read_maiweave(query, category, *, max_age_seconds, host_reply=False):
         return unknown
     if behavior.get('decision') == 'allow' and behavior.get('reason') == 'available':
         # The wake window or current activity may have ended during the second call.
-        return evaluate_status(status, category, max_age_seconds=max_age_seconds)
+        return evaluate_status(status, max_age_seconds=max_age_seconds)
     return {**unknown, 'reason': 'farewell' if behavior.get('reason') == 'farewell' else 'state_unknown'}
