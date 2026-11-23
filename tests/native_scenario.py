@@ -104,7 +104,7 @@ async def run(work):
         behavior=json.loads((work/'behavior.json').read_text())
         behavior['targets'][0]['providers']=['life','hush']
         behavior['targets'][0]['autonomous_plugins'].append('ilworkcn.maiweave')
-        behavior['life_provider']={'plugin_id':'ilworkcn.maiweave','api':'get_life_status','version':'1','protocol':'maiweave_status_v1'}
+        del behavior['life_provider']  # Exercise the production default.
         (work/'behavior.json').write_text(json.dumps(behavior),encoding='utf-8')
     from src.plugin_runtime.integration import get_plugin_runtime_manager
     from src.plugin_runtime.host.supervisor import PluginSupervisor

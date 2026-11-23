@@ -20,7 +20,6 @@
           "src/plugin_runtime/behavior_policy/runner.py",
           "src/plugin_runtime/behavior_policy/runtime.py",
           "src/plugin_runtime/behavior_policy/life.py",
-          "src/plugin_runtime/behavior_policy/life_status.py",
           "src/plugin_runtime/behavior_policy/delivery.py",
           "src/plugin_runtime/behavior_policy/__init__.py"
         ]

@@ -1,40 +1,19 @@
 # 生活状态接口
 
-本页供维护者接入生活插件。用户设置见 [MaiWeave](plugins/maiweave.md)。
+MaiWeave 决定当前生活状态下能否聊天、能否主动交流。MaiTogether 在受管目标发送前调用公开接口 `ilworkcn.maiweave.evaluate_behavior@1`。普通安装使用默认配置即可。作息设置见 [MaiWeave](plugins/maiweave.md)。
 
-MaiTogether 读取生活状态，只决定是否允许对外动作，不管理日程、不调用生活模型、不暂停聊天。默认后端是 `ilworkcn.maiweave.get_life_status@1`，普通配置可省略 `life_provider`。
+## 发送前如何查询
 
-## 模块
+| 本次发送 | 传给 MaiWeave 的 `behavior` |
+| --- | --- |
+| 普通聊天回复，经 Host 的消息发送流程发出 | `conversation` |
+| 插件发送的消息、戳一戳、贴表情、空间发布等 | `proactive` |
 
-- `life.py`：选择已注册 API，检查版本、可见性、超时和返回值。
-- `life_status.py`：读取生活状态。临时唤醒期间，主动动作还要确认麦麦是否正在告别；普通聊天的晚安回复由 MaiWeave 按会话处理。
-- `runtime.py`：结合生活、Hush 静音及 Identity 管理权限，在发送前决定是否继续。
+`life.py` 根据 Host 记录的调用来源、动作和消息编号选择参数。每次检查只查询一次。MaiWeave 返回 `allow / available` 后继续检查该目标的其他限制。返回 `defer`、`unknown` 或 `abstain` 时停止本次发送，日志保留 MaiWeave 给的原因。会话内的晚安告别由 MaiWeave 自身的发言钩子处理。
 
-Host 在 QQ 发送前查询生活状态。MaiWork 的后台任务按自己的设置运行。
+Host 验证接口注册、版本、行为类型及查询时间。单次查询限时 150 毫秒，`queried_at` 最多早于当前时间 180 秒。结果不缓存。接口缺失、超时、返回无效或调用期间被替换时停止发送。群静音由 MaiHush 决定，管理权限由 MaiIdentity 核对。
 
-## MaiWeave v1
-
-默认配置等价于：
-
-```json
-{
-  "life_provider": {
-    "plugin_id": "ilworkcn.maiweave",
-    "api": "get_life_status",
-    "version": "1",
-    "protocol": "maiweave_status_v1",
-    "max_age_seconds": 180
-  }
-}
-```
-
-仅接受正式注册、启用且版本相符的静态 API。`maiweave_status_v1` 只接受上述固定公开接口，不允许任意公开 API 提供授权。调用期间插件被卸载、替换或改变接口属性时，返回结果作废。
-
-使用 MaiWeave 0.11.3 新增的 `effective_sleeping`、`sleep_until` 和 `queried_at`。每次发送检查重新查询，检查就绪状态、活动时段、临时唤醒与睡眠截止时间。缺少必要字段、结果过期或时间边界已变化时拒绝。
-
-`queried_at` 是本次查询时间，`updated_at` 是身体与位置等数据的保存时间。Host 根据 `effective_sleeping` 判断实际睡眠，工作、学习和出行期间也会暂停受管社交动作。
-
-MaiWeave 同时提供公开的 `evaluate_behavior(behavior="conversation" | "proactive")`。它的对话规则允许部分午睡回复，主动规则的活动范围也与本项目有所不同。当前接入继续读取 `get_life_status`，执行统一的实际睡眠与忙碌限制。具体行为见 [MaiWeave 页面](plugins/maiweave.md#状态判断)。
+手动指定 MaiWeave 接口时使用 `api: evaluate_behavior` 和 `protocol: maiweave_behavior_v1`。只需调整结果的最长有效时间时，在 `life_provider` 中填写 `max_age_seconds` 即可。
 
 ## 其他后端
 
@@ -48,6 +27,6 @@ MaiWeave 同时提供公开的 `evaluate_behavior(behavior="conversation" | "pro
 
 `allow` 只接受 `available`；拒绝使用 `deny` 和具体原因。`abstain / not_managed` 只表示成功查询后确认该目标不归后端管理，不能表示故障。附带的 `ready` 与决定必须一致。
 
-单次生活查询预算 150ms，最终检查总预算 300ms。缺失、超时、异常或格式错误都会拒绝发送，不另找后端放行。日志保留 `life:原因`。
+最终发送检查的总时限为 300 毫秒。
 
 Host 后端由配置指定，插件不能自行替换默认后端。生活状态不授予管理员权限，也不表示活动内容适合公开分享。

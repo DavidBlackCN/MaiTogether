@@ -32,7 +32,7 @@ Host 判断谁发起动作、发往哪里。插件参数中的 `is_owner` 等字
 
 ## 新增模块
 
-`host/src/plugin_runtime/behavior_policy/` 中，`context.py` 记录调用来源，`actions.py` 分类 QQ 动作，`runtime.py` 汇总生活、静音和权限判断，`platform.py` 与 `delivery.py` 处理发送及结果，`life.py` 与 `life_status.py` 读取和解释生活状态。
+`host/src/plugin_runtime/behavior_policy/` 中，`context.py` 记录调用来源，`actions.py` 分类 QQ 动作，`runtime.py` 汇总生活、静音和权限判断，`platform.py` 与 `delivery.py` 处理发送及结果，`life.py` 向 MaiWeave 查询本次回复或主动互动能否发送。
 
 睡眠、忙碌来自 MaiWeave，群静音来自 Hush，管理授权来自 Identity。必要接口缺失、异常或超时会拒绝对应动作。
 

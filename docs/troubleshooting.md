@@ -2,7 +2,7 @@
 
 ## 睡着后还能收到消息、调用模型吗？
 
-可以。消息接收、聊天思考、唤醒和记忆按 MaiBot、MaiWeave 的原生方式运行。MaiTogether 在对外发送前检查状态，阻止仍处于睡眠或静音状态的消息、戳一戳、贴表情等动作。
+可以。消息接收、聊天思考、唤醒和记忆按 MaiBot、MaiWeave 的原生方式运行。MaiTogether 在对外发送前询问 MaiWeave 是否允许本次回复或互动，并检查群静音。午睡时能否回话取决于 MaiWeave 的午睡静默设置。
 
 如果希望睡眠时少处理私聊，可以在 MaiWeave 的「角色与作息 → 日常作息」开启「睡眠时普通私聊跳过 Planner」。普通私聊若没能唤醒麦麦，这条消息会跳过模型判断，也不会进入 MaiBot 聊天历史。这个选项默认关闭，只管私聊。
 
@@ -13,9 +13,9 @@
 | 原因 | 先检查什么 |
 | --- | --- |
 | `life:sleeping`、`life:busy` | MaiWeave 当前生活状态 |
-| `state_unknown` | MaiWeave 的公开状态接口是否可用，是否返回完整的活动、实际睡眠和查询时间 |
+| `life:not_ready`、`life:disabled` | MaiWeave 的生活功能是否已启用、加载完成 |
+| `LIFE_PROVIDER_PROTOCOL` | MaiWeave 的行为接口版本、返回的行为类型和查询时间是否有效 |
 | `life_state_stale` | 查询时间是否过期，宿主与插件的系统时间是否一致 |
-| `life_boundary_changed` | 查询期间活动或唤醒期限已变化，下一次动作会重新查询 |
 | `LIFE_PROVIDER_MISSING`、超时 | MaiWeave 是否加载成功；其他必要插件是否正常 |
 | `BEHAVIOR_BACKGROUND_TARGET_DENIED` | 运行配置中对应会话的名单是否与示例一致；清单外插件见[自动行动权限](configuration.md#哪些插件可以自动行动) |
 | `BEHAVIOR_ADAPTER_CONTRACT_UNAVAILABLE` | 是否使用配套连接器，以及账号、scope 是否一致 |

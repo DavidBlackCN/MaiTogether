@@ -1,9 +1,11 @@
 """One configured life backend for external behavior checks."""
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import asyncio
 
 from .context import provider_request
-from .life_status import WEAVE_PLUGIN, WEAVE_API, read_maiweave
+WEAVE_PLUGIN = 'ilworkcn.maiweave'
+WEAVE_API = 'evaluate_behavior'
 
 
 @dataclass(frozen=True)
@@ -11,7 +13,7 @@ class LifeProvider:
     plugin_id: str = WEAVE_PLUGIN
     api: str = WEAVE_API
     version: str = '1'
-    protocol: str = 'maiweave_status_v1'
+    protocol: str = 'maiweave_behavior_v1'
     max_age_seconds: int = 180
 
     @classmethod
@@ -24,11 +26,11 @@ class LifeProvider:
                 or result.plugin_id != result.plugin_id.strip()
                 or not isinstance(result.api, str) or not result.api.isidentifier()
                 or result.version != '1'
-                or result.protocol not in ('decision_v1', 'maiweave_status_v1')
+                or result.protocol not in ('decision_v1', 'maiweave_behavior_v1')
                 or type(result.max_age_seconds) is not int or not 10 <= result.max_age_seconds <= 3600):
             raise ValueError('Life Provider requires a plugin, API name and version "1"')
-        if result.protocol == 'maiweave_status_v1' and (result.plugin_id, result.api) != (WEAVE_PLUGIN, WEAVE_API):
-            raise ValueError('MaiWeave status protocol requires the official plugin and API')
+        if result.protocol == 'maiweave_behavior_v1' and (result.plugin_id, result.api) != (WEAVE_PLUGIN, WEAVE_API):
+            raise ValueError('MaiWeave behavior protocol requires the official plugin and API')
         return result
 
     def normalize(self, names):
@@ -38,11 +40,11 @@ class LifeProvider:
             raise ValueError('Invalid behavior target/providers')
         return [name for name in ('life', 'hush') if name in names]
 
-    def _entry(self, supervisor, stream, name=None):
+    def _entry(self, supervisor, stream):
         entries = supervisor.api_registry.get_apis(
-            plugin_id=self.plugin_id, name=name or self.api, version=self.version,
+            plugin_id=self.plugin_id, name=self.api, version=self.version,
             enabled_only=True, session_id=stream)
-        if (len(entries) != 1 or entries[0].public != (self.protocol == 'maiweave_status_v1') or entries[0].dynamic
+        if (len(entries) != 1 or entries[0].public != (self.protocol == 'maiweave_behavior_v1') or entries[0].dynamic
                 or entries[0].version != self.version):
             raise RuntimeError('LIFE_PROVIDER_CONTRACT_UNAVAILABLE')
         return entries[0]
@@ -57,29 +59,52 @@ class LifeProvider:
         supervisor = manager._get_supervisor_for_plugin(self.plugin_id)
         if supervisor is None:
             raise RuntimeError('LIFE_PROVIDER_MISSING')
-        async def query(name, args):
-            entry = self._entry(supervisor, request['stream_id'], name)
+        # Only a Host chat message passing through Platform IO can use the conversation verdict.
+        host_reply = (request.get('origin', {}).get('kind') == 'host'
+                      and request.get('action') in ('platform.message', 'send_msg', 'send_private_msg', 'send_group_msg')
+                      and bool(request.get('message_id')) and not space)
+        behavior = 'conversation' if host_reply else 'proactive'
+        args = {'behavior': behavior} if self.protocol == 'maiweave_behavior_v1' else {}
+        token = provider_request.set(request)
+        try:
+            entry = self._entry(supervisor, request['stream_id'])
             envelope = await asyncio.wait_for(supervisor.invoke_api(
                 self.plugin_id, entry.handler_name, args, timeout_ms=150), .15)
             if (manager._get_supervisor_for_plugin(self.plugin_id) is not supervisor
-                    or self._entry(supervisor, request['stream_id'], name) is not entry):
+                    or self._entry(supervisor, request['stream_id']) is not entry):
                 raise RuntimeError('LIFE_PROVIDER_CHANGED')
             payload = envelope.payload
             if envelope.error or not isinstance(payload, dict) or payload.get('success') is not True:
                 raise RuntimeError('LIFE_PROVIDER_FAILED')
-            return payload.get('result')
-
-        token = provider_request.set(request)
-        try:
+            result = payload.get('result')
             if self.protocol == 'decision_v1':
-                return validate_result(await query(self.api, {}))
-            # MaiWeave's send hook already limits ordinary Host replies to the farewell chat.
-            host_reply = (request.get('origin', {}).get('kind') == 'host'
-                          and request.get('action') in ('platform.message', 'send_msg', 'send_private_msg', 'send_group_msg')
-                          and bool(request.get('message_id')))
-            return await read_maiweave(query, max_age_seconds=self.max_age_seconds, host_reply=host_reply)
+                return validate_result(result)
+            return weave_decision(result, behavior, self.max_age_seconds)
         finally:
             provider_request.reset(token)
+
+
+def weave_decision(result, behavior, max_age_seconds):
+    if (not isinstance(result, dict) or type(result.get('version')) is not int
+            or result['version'] != 1 or result.get('behavior') != behavior):
+        raise RuntimeError('LIFE_PROVIDER_PROTOCOL')
+    try:
+        queried = datetime.fromisoformat(result['queried_at'])
+        if queried.utcoffset() is None:
+            raise ValueError('missing timezone')
+        age = (datetime.now(timezone.utc) - queried).total_seconds()
+    except (KeyError, ValueError, TypeError, OverflowError) as exc:
+        raise RuntimeError('LIFE_PROVIDER_PROTOCOL') from exc
+    if not -5 <= age <= max_age_seconds:
+        return {'version': 1, 'decision': 'deny', 'reason': 'life_state_stale'}
+    decision, reason = result.get('decision'), result.get('reason')
+    if not isinstance(reason, str) or not reason.strip():
+        raise RuntimeError('LIFE_PROVIDER_PROTOCOL')
+    if decision == 'allow' and reason == 'available':
+        return {'version': 1, 'decision': 'allow', 'reason': reason}
+    if decision in ('defer', 'unknown', 'abstain'):
+        return {'version': 1, 'decision': 'deny', 'reason': reason}
+    raise RuntimeError('LIFE_PROVIDER_PROTOCOL')
 
 
 def validate_result(result):

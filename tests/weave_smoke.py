@@ -23,10 +23,11 @@ async def run_cases(values):
     async def decision():
         return await policy._provider('life', {'category': 'social', 'stream_id': c.stream,
             'route': dict(policy.targets[0]), 'origin': {'kind': 'host'}})
-    status = await c.call(plugin, 'get_life_status')
-    assert status['effective_sleeping'] is False, status
+    for behavior in ('conversation', 'proactive'):
+        verdict = await c.call(plugin, 'evaluate_behavior', {'behavior': behavior})
+        assert (verdict['behavior'], verdict['decision'], verdict['reason']) == (behavior, 'allow', 'available'), verdict
     assert (await decision())['decision'] == 'allow'
-    c.cases.append('public_status_works_without_private_capability_or_test_api')
+    c.cases.append('both_public_behavior_verdicts_work_without_test_api')
     async def ready():
         return bool(get_platform_io_manager().resolve_drivers(RouteKey('qq', '123456789', None)))
     await c.wait(ready)

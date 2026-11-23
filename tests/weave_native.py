@@ -73,7 +73,7 @@ async def run_cases(values):
         assert len(c.writes)==n+1
         await c.tool('react_emoji',{'message_id':'-999','emoji_id':128512})
         assert len(c.writes)==n+2
-    c.cases.append('public_status_maps_to_policy_queries_and_actual_tools')
+    c.cases.append('public_behavior_api_controls_actual_tools')
     assert (await c.call(WEAVE, 'acceptance_delivery', {'mode': 'message', 'stream_id': c.stream}))['sent'] is True
     result = await publish('normal')
     assert result['status'] == '已发布', result
@@ -124,15 +124,27 @@ async def run_cases(values):
     assert len(c.writes) == n
     await seed()
     c.cases.append('upstream_share_generation_sleep_race_blocked_before_submission')
-    for kind,reason in [('work','busy'),('study','busy'),('travel','busy'),('sleep','sleeping')]:
-        await seed(kind=kind)
-        assert (await decision('social'))['reason']==reason
-        if policy.behavior_enabled:
-            n=len(c.writes)
-            assert not (await c.probe('api'))['success']
-            await c.tool('emoji_like',{'stream_id':c.stream,'target_message_id':'-999','emoji':'128512'})
-            assert len(c.writes)==n
-    c.cases.append('work_study_travel_and_sleep_block_social')
+    async def check_outbound(kind, chat_allowed, active_allowed, **settings):
+        await seed(kind=kind, **settings)
+        for behavior, expected in [('conversation', chat_allowed), ('proactive', active_allowed)]:
+            verdict = await c.call(WEAVE, 'evaluate_behavior', {'behavior': behavior})
+            assert (verdict['decision'] == 'allow') == expected, (kind, behavior, verdict)
+        before = len(c.writes)
+        batch = await get_platform_io_manager().send_message(c.raw('ordinary host reply'), RouteKey('qq', '123456789', None))
+        assert len(c.writes) == before + int(chat_allowed), (kind, batch)
+        before = len(c.writes)
+        assert bool(await c.probe()) == active_allowed, kind
+        assert bool((await c.probe('api'))['success']) == active_allowed, kind
+        await c.tool('emoji_like', {'stream_id': c.stream, 'target_message_id': '-999', 'emoji': '128512'})
+        assert len(c.writes) == before + 3 * int(active_allowed), kind
+
+    for kind in ('work', 'study'):
+        await check_outbound(kind, True, False)
+    await check_outbound('travel', True, True)
+    c.cases.append('work_study_and_travel_follow_upstream_for_chat_and_plugin_sends')
+    await check_outbound('sleep', False, False)
+    await check_outbound('sleep', True, False, nap_quiet=False)
+    c.cases.append('nap_setting_allows_only_ordinary_reply_and_quiet_sleep_blocks_both')
     # Native reception hook can wake without a model.
     await seed(kind='sleep')
     await c.call(WEAVE,'acceptance_person',{'stream_id':c.stream,'user_id':'10001'})
@@ -177,6 +189,7 @@ async def run_cases(values):
         assert (await c.command('/maihush mute 5m'))[0]
         n=len(c.writes)
         assert not await c.probe()
+        await get_platform_io_manager().send_message(c.raw('ordinary reply in muted group'), RouteKey('qq', '123456789', None))
         assert len(c.writes)==n
         assert (await c.command('/maihush unmute'))[0]
         c.cases.append('hush_and_identity_command_authorization_retained')
@@ -203,13 +216,13 @@ async def run_cases(values):
         io.set_inbound_dispatcher(None)
         c.cases.append('original_smart_poke_real_notice_allowed_awake_denied_asleep')
     await seed()
-    entry=c.supervisor.api_registry.get_apis(plugin_id=WEAVE,name='get_life_status',version='1')[0]
+    entry=c.supervisor.api_registry.get_apis(plugin_id=WEAVE,name='evaluate_behavior',version='1')[0]
     for field,value in [('public',False),('version','2'),('enabled',False)]:
         old=getattr(entry,field);setattr(entry,field,value)
         try:
             try: await decision()
             except RuntimeError: pass
-            else: raise AssertionError('bad public status contract allowed')
+            else: raise AssertionError('bad public behavior contract allowed')
         finally: setattr(entry,field,old)
     c.cases.append('actual_public_registry_visibility_version_and_disabled_rejected')
     cfg=c.configs['maiweave']

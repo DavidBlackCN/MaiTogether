@@ -22,8 +22,8 @@ def test_default_backend_is_maiweave_without_mutating_input():
     assert original == copy
     assert modern.life == LifeProvider()
     assert modern.life.plugin_id == 'ilworkcn.maiweave'
-    assert modern.life.api == 'get_life_status'
-    assert modern.life.protocol == 'maiweave_status_v1'
+    assert modern.life.api == 'evaluate_behavior'
+    assert modern.life.protocol == 'maiweave_behavior_v1'
     assert BehaviorPolicy(config(['hush'])).targets[0]['providers'] == ['hush']
 
 

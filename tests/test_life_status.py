@@ -1,92 +1,74 @@
-"""MaiWeave state boundaries for outgoing social actions."""
-from datetime import datetime, timezone
-from copy import deepcopy
+"""The Host consumes a MaiWeave verdict for this action, without reading a schedule."""
+from datetime import datetime, timedelta, timezone
+from unittest.mock import Mock
+
 import pytest
 from test_life import backend, REQUEST
-from src.plugin_runtime.behavior_policy.life import LifeProvider
-from src.plugin_runtime.behavior_policy.life_status import evaluate_status
+from src.plugin_runtime.behavior_policy.life import LifeProvider, weave_decision
 
-NOW = 1793966400
-def iso(offset=0):
-    return datetime.fromtimestamp(NOW+offset, timezone.utc).isoformat()
 
-def status(kind='leisure', **values):
-    effective = kind == 'sleep' and values.get('schedule_enabled', True) and not values.get('awake_until')
-    return {'version': 1, 'ready': True, 'enabled': True, 'schedule_enabled': True,
-        'updated_at': iso(), 'queried_at': iso(), 'sleeping': kind == 'sleep', 'awake_until': None,
-        'effective_sleeping': effective, 'sleep_until': iso(60) if effective else None, 'next_plan': None,
-        'current': {'id': 'activity', 'kind': kind, 'status': 'scheduled',
-                    'start': iso(-60), 'end': iso(60)} if kind else None, **values}
+def verdict(**changes):
+    return {'version': 1, 'queried_at': datetime.now(timezone.utc).isoformat(),
+            'decision': 'allow', 'reason': 'available', 'behavior': 'proactive', **changes}
 
-@pytest.mark.parametrize('kind,reason', [
-    ('leisure','available'), ('sleep','sleeping'),
-    ('work','busy'), ('study','busy'), ('travel','busy'),
-    (None,'available'),
+
+@pytest.mark.parametrize('kind,action,message,expected', [
+    ('host', 'platform.message', 'msg', 'conversation'),
+    ('host', 'send_msg', 'msg', 'conversation'),
+    ('host', 'send_group_msg', 'msg', 'conversation'),
+    ('host', 'send_private_msg', 'msg', 'conversation'),
+    ('host', 'send_group_msg', '', 'proactive'),
+    ('background', 'send_group_msg', 'msg', 'proactive'),
+    ('command', 'platform.message', 'msg', 'proactive'),
+    ('tool', 'send_private_msg', 'msg', 'proactive'),
+    ('host', 'send_poke', 'msg', 'proactive'),
+    ('host', 'set_msg_emoji_like', 'msg', 'proactive'),
+    ('host', 'send_qzone_msg', 'msg', 'proactive'),
 ])
-def test_activity_rules(kind, reason):
-    value=status(kind); original=deepcopy(value)
-    r=evaluate_status(value, now=NOW)
-    assert r['reason'] == reason
-    assert r['decision'] == ('allow' if reason == 'available' else 'deny')
-    assert value==original
+@pytest.mark.asyncio
+async def test_one_query_of_registered_api(kind, action, message, expected):
+    manager, supervisor, entry = backend(verdict(behavior=expected))
+    entry.public = True
+    registry = Mock(return_value=[entry])
+    supervisor.api_registry.get_apis = registry
+    result = await LifeProvider().evaluate(manager, {
+        **REQUEST, 'origin': {'kind': kind}, 'action': action, 'message_id': message})
+    assert result == {'version': 1, 'decision': 'allow', 'reason': 'available'}
+    assert all(call.kwargs['name'] == 'evaluate_behavior' for call in registry.call_args_list)
+    supervisor.invoke_api.assert_awaited_once_with('ilworkcn.maiweave', 'handler', {'behavior': expected}, timeout_ms=150)
 
-@pytest.mark.parametrize('value,reason', [
-    (status(None, awake_until=iso(60)), 'available'),
-    (status('sleep', awake_until=iso(60)), 'available'),
-    (status(None, awake_until=iso(0)), 'life_boundary_changed'),
-    (status(None, schedule_enabled=False), 'available'),
-    (status('sleep', schedule_enabled=False), 'available'),
-    (status(enabled=False), 'life_disabled'), (status(ready=False), 'not_ready'),
-    (status(updated_at=iso(-86400)), 'available'),
-    (status(queried_at=iso(-181)), 'life_state_stale'),
-    (status(queried_at=iso(6)), 'life_state_stale'),
-    (status(updated_at=iso(6)), 'state_unknown'),
-    (status(None, effective_sleeping=True, sleep_until=iso(60)), 'sleeping'),
-    (status(None, effective_sleeping=True, sleep_until=iso()), 'life_boundary_changed'),
-    (status(None, effective_sleeping=True), 'state_unknown'),
-    (status(effective_sleeping=True, sleep_until=iso(60)), 'state_unknown'),
-    (status(sleep_until=iso(60)), 'state_unknown'),
-    (status('sleep', effective_sleeping=False, sleep_until=None), 'state_unknown'),
-    (status('sleep', quiet=False), 'sleeping'),
-    (status(None, awake_until=iso(60), effective_sleeping=True, sleep_until=iso(60)), 'state_unknown'),
-    (status(None, schedule_enabled=False, effective_sleeping=True, sleep_until=iso(60)), 'state_unknown'),
-    (status(None, next_plan={'start':iso(60)}), 'available'),
-    (status(None, next_plan={'start':iso()}), 'life_boundary_changed'),
-    (status(None, next_plan={'start':'invalid'}), 'state_unknown'),
-    (status(version=True), 'life_contract_mismatch'),
-    (status(version=2), 'life_contract_mismatch'),
-    (status(ready='true'), 'state_unknown'), (status(sleeping=None), 'state_unknown'),
-    (status('sleep', sleeping=False), 'state_unknown'),
-    (status(updated_at='2026-11-06T12:00:00'), 'state_unknown'),
-    (status(awake_until='bad'), 'state_unknown'),
+
+@pytest.mark.parametrize('decision,reason', [('defer','busy'), ('defer','farewell'), ('defer','sleeping'),
+    ('defer','new_upstream_reason'), ('unknown','not_ready'), ('abstain','disabled')])
+def test_only_explicit_permission_allows(decision, reason):
+    assert weave_decision(verdict(decision=decision, reason=reason), 'proactive', 180) == {
+        'version': 1, 'decision': 'deny', 'reason': reason}
+
+
+@pytest.mark.parametrize('changes', [
+    {'version': True}, {'version': 2}, {'behavior': 'conversation'}, {'decision': 'unexpected'},
+    {'decision': 'allow', 'reason': 'not_ready'}, {'reason': ''}, {'queried_at': None},
+    {'queried_at': 'unreadable'}, {'queried_at': '2026-11-23T12:00:00'},
 ])
-def test_sleep_and_health_boundaries(value, reason):
-    assert evaluate_status(value, now=NOW)['reason']==reason
+def test_wrong_contract_never_allows(changes):
+    with pytest.raises(RuntimeError):
+        weave_decision(verdict(**changes), 'proactive', 180)
 
-@pytest.mark.parametrize('field', ['version','ready','enabled','schedule_enabled','updated_at','queried_at',
-                                 'sleeping','effective_sleeping','sleep_until','awake_until','current','next_plan'])
-def test_missing_fields_never_allow(field):
-    value=status(); del value[field]
-    assert evaluate_status(value,now=NOW)['decision']=='deny'
 
-@pytest.mark.parametrize('field,value', [('kind','new_kind'),('status','completed'),('id',''),('end',iso()),('start',iso(1))])
-def test_unknown_or_expired_activity(field,value):
-    s=status();s['current'][field]=value
-    assert evaluate_status(s,now=NOW)['decision']=='deny'
+@pytest.mark.parametrize('seconds', [-181, 6])
+def test_stale_or_future_verdict(seconds):
+    at = datetime.now(timezone.utc) + timedelta(seconds=seconds)
+    result = weave_decision(verdict(queried_at=at.isoformat()), 'proactive', 180)
+    assert (result['decision'], result['reason']) == ('deny', 'life_state_stale')
+
 
 @pytest.mark.asyncio
-async def test_public_state_is_only_accepted_with_explicit_official_protocol():
-    now=datetime.now(timezone.utc).isoformat()
-    s=status(None, schedule_enabled=False, updated_at=now, queried_at=now)
-    manager, supervisor, entry=backend(s)
-    entry.public=True
-    configured=dict(plugin_id='ilworkcn.maiweave', api='get_life_status', protocol='maiweave_status_v1')
-    p=LifeProvider.from_config({'life_provider':configured})
-    assert (await p.evaluate(manager, REQUEST))['decision']=='allow'
-    assert (await LifeProvider().evaluate(manager, REQUEST))['decision']=='allow'
+async def test_public_api_only_for_maiweave():
+    manager, _, entry = backend(verdict())
     with pytest.raises(RuntimeError):
-        await LifeProvider(plugin_id='test.other', api='life_state', protocol='decision_v1').evaluate(manager, REQUEST)
-    entry.public=False
-    with pytest.raises(RuntimeError): await p.evaluate(manager, REQUEST)
-    with pytest.raises(ValueError): LifeProvider.from_config({'life_provider':{**configured,'plugin_id':'other'}})
-    with pytest.raises(ValueError): LifeProvider.from_config({'life_provider':{**configured,'max_age_seconds':True}})
+        await LifeProvider().evaluate(manager, REQUEST)
+    entry.public = True
+    with pytest.raises(RuntimeError):
+        await LifeProvider(protocol='decision_v1').evaluate(manager, REQUEST)
+    with pytest.raises(ValueError):
+        LifeProvider.from_config({'life_provider': {'plugin_id': 'other'}})

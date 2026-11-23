@@ -21,6 +21,10 @@ class AcceptanceProbe:
         now=self.now()
         self.config.life.schedule_enabled=not all_day
         self.config.life.nap_quiet=nap_quiet
+        if not nap_quiet:
+            # Keep this nap outside night hours at any test start time.
+            self.config.life.sleep_hour = (now.hour + 2) % 24
+            self.config.life.wake_hour = (now.hour + 3) % 24
         with self.store.db:
             for row in self.store.all('plan'): self.store.delete('plan',row['id'])
             self.store.delete('runtime','awakening')
