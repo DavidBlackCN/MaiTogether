@@ -1,17 +1,7 @@
 # Self-Identity
 
-[项目与安装说明](https://github.com/ValleyWinds/Self-Identity)
+保存麦麦自己的形象图片和人设资料。[上游项目](https://github.com/ValleyWinds/Self-Identity)
 
-## 简介
+**暂缓安装。** 已审查的 1.4.5 声明最高支持 Host 1.3.99。
 
-保存麦麦自己的人设资料、形象图片，并提供检索工具。[MaiIdentity](maiidentity.md)记录的是与麦麦聊天的人，两者可以搭配。
-
-## 推荐配置
-
-当前上游 1.4.5 声明最高支持 Host 1.3.99，暂不用于本项目的 Host 1.4.8 组合。下列配置供支持版本可用后参考。
-
-在插件配置页把示例资料替换成自己的角色设定，图片按上游说明放入 `self_image`。可在人设中提示：被问到外貌、口味等固定细节时先查询自我信息。
-
-## 补充说明
-- 日程和当前活动继续由 MaiWeave 提供；不要把每天变化的生活状态再手抄到固定人设里。
-- 资料检索不需要后台发送权限，展示图片仍受正常发送检查。
+角色资料和 `self_image` 适合存放外貌、口味等固定细节。聊天对象的身份由 [MaiIdentity](maiidentity.md) 管理，当天的活动由 [MaiWeave](maiweave.md) 提供。

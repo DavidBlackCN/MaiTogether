@@ -1,6 +1,6 @@
 # MaiWork
 
-从 MaiBot 插件市场安装 MaiWork，或按[上游安装说明](https://github.com/CharTyr/MaiWork#快速开始)安装原版。它可以在后台接单、调用 Agent 和工具、通过群消息或文件交付结果。
+在后台接单、调用 Agent 和工具，通过群消息或文件交付结果。可从 MaiBot 插件市场安装，或按[上游安装说明](https://github.com/CharTyr/MaiWork#快速开始)安装原版。
 
 ## 开始使用
 

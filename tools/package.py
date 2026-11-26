@@ -58,7 +58,7 @@ def main():
     (out/'README.md').write_text(f'# MaiTogether {version}\n\n'
         + ('包内包含 MaiWeave，设置见 [插件说明](maintenance/docs/plugins/maiweave.md)。\n\n' if a.maiweave_source else 'MaiWeave 请按[插件说明](maintenance/docs/plugins/maiweave.md)另行安装。\n\n') +
         f'`host/` 为组装后的 Host {baseline["host"]["tag"]}；将 `plugins/` 中的插件及 `adapter/` 连接器安装到所选 Bot 实例的插件目录，同一插件仅保留一份。\n\n'
-        f'安装步骤和账号、群号设置见 [安装说明](maintenance/docs/setup.md)。SDK 使用 {baseline["sdk"]["tag"]}，详见 maintenance/baseline.json。\n\n'
+        f'安装步骤和账号、群号设置见 [安装说明](maintenance/docs/setup.md#从成品包安装)。SDK 使用 {baseline["sdk"]["tag"]}，详见 maintenance/baseline.json。\n\n'
         '本包不含运行配置、账号、数据库或 Python 环境，请保留实例中的原有文件。\n',encoding='utf-8')
     manifest=hashes(out)
     (out/'SHA256SUMS.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')

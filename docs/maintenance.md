@@ -2,7 +2,7 @@
 
 普通安装见[安装与设置](setup.md)。本页供维护者更新补丁、构建和测试。
 
-当前配套使用 Host 1.4.8、SDK 2.23.0、QQ 连接器 1.3.3，MaiTogether 修改版本为 0.7.4。准确提交见 [baseline.json](../baseline.json)。
+Host、SDK、连接器和 MaiTogether 的配套版本及准确提交见 [baseline.json](../baseline.json)。
 
 ## 目录
 
@@ -16,6 +16,10 @@
 | `docs/plugins/` | 每个选用插件的版本、配置和搭配说明 |
 
 运行配置、凭据、数据库、日志和内部验收记录不进入仓库。官方文件修改说明见[补丁范围](patches.md)。
+
+## 维护插件文档
+
+在插件清单用一句话写明用途，链接到同名专页。有安装限制时，在插件名旁标出“暂缓安装”“指定分支”或“指定提交”。专页依次写用途、可用的安装入口、必须改的设置、与其他插件搭配时的注意事项。沿用默认配置的插件一段即可。完整配置由上游维护，这里只列本组合实际需要的字段。
 
 ## 从源码构建
 
@@ -33,7 +37,7 @@ python tools/build.py --host-source ../upstream/MaiBot --adapter-source ../upstr
 python tools/prepare.py --host ../MaiBot --adapter-source ../upstream/MaiBot-SnowLuma-Adapter --output ../MaiTogether-ready
 ```
 
-不加 `--apply` 时只检查 Host 并生成连接器与配置示例，不修改 Host。
+此模式只检查 Host，并导出连接器与配置示例。可重复使用内容与本版一致的导出目录。只安装 Host 可用 `python tools/install.py --host ../MaiBot --apply`。普通安装要在脚本中传入账号和群号时，可给快速开始命令加 `--account 123456789 --groups 987654321 876543210`。
 
 ## 跟进官方稳定版
 
@@ -41,7 +45,7 @@ python tools/prepare.py --host ../MaiBot --adapter-source ../upstream/MaiBot-Sno
 
 ```bash
 python tools/upgrade.py check --host-source ../upstream/MaiBot --sdk-source ../upstream/maibot-plugin-sdk --adapter-source ../upstream/MaiBot-SnowLuma-Adapter --output ../upgrade-candidate
-python tools/validate.py --candidate ../upgrade-candidate --workspace ..
+python tools/validate.py --candidate ../upgrade-candidate --workspace .. --maiweave ../.implementation/vendor/MaiWeave
 python tools/upgrade.py promote --candidate ../upgrade-candidate
 ```
 
@@ -85,13 +89,9 @@ python tools/export_patches.py --host-source ../upstream/MaiBot --adapter-source
 
 导出会更新补丁和校验值，随后重新回归。`tools/package.py` 可用 `--maiweave-source` 和 `--maiwork-source` 将审查过的原版源码随包分发。
 
-## 更新与恢复
+## 实例快照
 
-社区插件按各自页面和上游说明更新，不必因此重新安装 Host。Host 和配套 QQ 连接器则一起更新，不用市场原版覆盖修改版连接器。
-
-更新主程序时先停机备份，准备对应官方版本的源码、应用匹配的 MaiTogether 修改，再使用原 Bot 实例目录启动。不要在旧补丁上反复覆盖新补丁，也不要把运行配置和数据复制进源码仓库。依赖按目标 Host 更新。
-
-`install.py` 和 `prepare.py --apply` 会备份受影响源码，备份路径打印在终端。配置、插件数据和 Python 环境仍需另行备份。完整代码与实例快照可用：
+先停止 Host 和 Runner，将备份写到源码和实例目录之外。用户更新与恢复见[实例设置](setup.md#更新与恢复)。
 
 ```bash
 python tools/snapshot.py --code ../MaiBot --runtime ../instance --snapshot ../backup-before-update

@@ -14,36 +14,32 @@
 
 生活和主动交流的设置见 [MaiWeave 配置](docs/plugins/maiweave.md)，搜索、回复优化等插件见[插件清单](docs/plugins.md)。
 
-## 快速开始：安装主程序修改
+## 快速开始
 
-> 当前适用 **MaiBot 1.4.8**，仍处于开发测试阶段，请在开始操作前备份源码、配置和数据！
+适用于已有的 **MaiBot 1.4.8 官方 Git 源码**。先停止使用这份源码的 MaiBot 实例，备份源码、插件、配置和数据。安装工具需要 Git 和 Python 3.11 或更高版本。
 
-以下从已有的官方 MaiBot Git 源码继续，在 MaiBot 的父目录获取本项目：
+在 MaiBot 的上一级目录获取本项目：
 
 ```bash
 git clone https://github.com/DavidBlackCN/MaiTogether.git
 cd MaiTogether
 ```
 
-将下面的 `../MaiBot` 换成主程序路径，输出目录使用一个新目录。
-
-**Windows（PowerShell）：**
+**Windows PowerShell**
 
 ```powershell
-python tools/prepare.py --host "../MaiBot" --output "../MaiTogether-ready" --apply
+python tools/prepare.py --host "../MaiBot" --apply
 ```
 
-**Linux：**
+**Linux**
 
 ```bash
-python3 tools/prepare.py --host ../MaiBot --output ../MaiTogether-ready --apply
+python3 tools/prepare.py --host ../MaiBot --apply
 ```
 
-命令会检查版本、准备配套 QQ 连接器，然后备份并安装主程序修改。不会安装生态插件、改写运行配置或数据库。
+将 `../MaiBot` 换成源码路径。如果平时用 `maibot run --directory ...` 启动，在命令末尾加上 `--instance "平时使用的实例路径"`。
 
-输出目录中的 `adapter/` 是配套 QQ 连接器，`behavior_control.example.json` 是配置示例。按[安装与设置](docs/setup.md)放入对应 Bot 实例、选择插件并填写账号和群号即可启用。已经安装过主程序修改时，无需因为新增插件重复执行以上命令。
-
-只想安装 Host 源码、不下载连接器时，可用 `python tools/install.py --host ../MaiBot --apply`；Linux 使用 `python3`。版本不同或已有源码改动时，安装器会停止，处理方式见[常见问题](docs/troubleshooting.md)。
+首次安装会询问机器人 QQ 和要管理的群号，随后安装主程序修改和配套 QQ 连接器，写好发送检查配置。重复运行会跳过已装好的部分，保留已有配置。接下来按[实例设置](docs/setup.md)安装核心插件，再启动麦麦。
 
 ## 使用前了解
 

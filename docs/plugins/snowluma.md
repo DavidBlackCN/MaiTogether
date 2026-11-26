@@ -1,15 +1,5 @@
 # SnowLuma QQ 连接器
 
-[上游项目](https://github.com/Mai-with-u/MaiBot-SnowLuma-Adapter)
+负责麦麦在 QQ 上收发消息、戳一戳、贴表情和发空间动态。请用 [MaiTogether 安装命令](../../README.md#快速开始)安装带发送检查的版本。
 
-## 简介
-
-连接 MaiBot 与 SnowLuma。MaiTogether 使用带发送检查的版本，在消息、戳一戳和贴表情等动作提交前查询生活和静音状态。
-
-## 补充说明
-
-[安装命令](../setup.md)会准备好 `adapter/`，无需自己给连接器打补丁。已有连接器时保留原 `config.toml`、地址、端口和数据，只替换代码；同一 Bot 实例只安装一份。
-
-连接器与 Host 修改一起更新。不要用插件市场的原版直接覆盖配套版本，否则统一检查可能无法工作。机器人账号、群范围和 scope 仍需符合连接器自己的设置。
-
-当前配套基于 QQ 连接器 1.3.3。请使用安装工具生成的 `adapter/`，它会在动作发给 QQ 前检查权限、作息和群静音。
+已有连接器沿用原目录、地址、端口和账号。每个实例只保留一个 SnowLuma 连接器，并与主程序修改一起更新。从市场覆盖成原版会失去配套检查。[连接器上游](https://github.com/Mai-with-u/MaiBot-SnowLuma-Adapter)

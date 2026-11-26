@@ -1,53 +1,27 @@
-# 安装与设置
+# 实例设置
 
-从已经能运行的 MaiBot 开始。主程序修改和 QQ 连接器只需安装一次，之后按需添加插件。
+从官方源码安装请看 [README 快速开始](../README.md#快速开始)。安装器会把 QQ 连接器放进所选实例的 `plugins/`，并在首次配置时创建 `config/behavior_control.json`。已有连接器可以沿用原目录名、`config.toml`、地址和端口。
 
-## 1. 安装主程序修改和 QQ 连接器
+## 启用生活、身份和群静音
 
-先停止 MaiBot，备份源码、插件、配置和数据。在 MaiTogether 目录运行：
+1. 按 [MaiWeave](plugins/maiweave.md) 设置角色与作息，在 [MaiIdentity](plugins/maiidentity.md) 填自己的管理员账号，让 [MaiHush](plugins/maihush.md) 使用这份名单。
+2. 启动 MaiBot，确认三个插件和 SnowLuma 连接器已加载。在安装时指定的群正常聊天，再用管理员账号发送 `/maihush mute 1m`，观察群静音和恢复发言。
+3. 从[插件清单](plugins.md)选择其他插件。增加插件无需重新安装程序修改。
 
-```powershell
-# Windows PowerShell
-python tools/prepare.py --host "../MaiBot" --output "../MaiTogether-ready" --apply
-```
+安装器创建的配置包含所填的群和机器人自己的 QQ 空间。以后增加受管群，在实例的 `config/behavior_control.json` 中复制一个 `group` 项，修改 `target_id` 后重启。MaiHush 默认管理全部 QQ 群。只有选用 Hush 群白名单时才需要在 Hush 再加群号，并留意排除名单。私聊、多账号和后台权限见[更多配置](configuration.md)。
 
-```bash
-# Linux
-python3 tools/prepare.py --host ../MaiBot --output ../MaiTogether-ready --apply
-```
+## 从成品包安装
 
-把 `../MaiBot` 改成已有的主程序源码路径，输出目录须是一个新目录。需要 Git 和 Python 3.11 以上版本；运行 MaiBot 使用它原有的 Python 环境。
+先停机备份。用包内的 `host/` 运行 MaiBot，并指定原来的实例目录。将包内 `plugins/` 中需要的插件和 `adapter/` 连接器装入实例的 `plugins/`。每个插件只保留一份；已有连接器请保留原配置和数据，先备份再替换代码。
 
-命令会检查主程序版本，下载并制作配套 QQ 连接器，再备份和修改 Host 源码。**当前适用 MaiBot 1.4.8**；版本不同或源码已有修改时会停止，不会自动降级、重置源码或改动数据库。
+已有 `config/behavior_control.json` 时继续使用。首次设置可从 `maintenance/behavior_control.example.json` 复制到该路径，将 `123456789` 替换成机器人 QQ，`987654321` 替换成受管群号，再按上节启用核心插件。使用离线导出目录时，示例在导出目录顶层。
 
-将输出的 `adapter/` 安装到所选 Bot 实例的 `plugins/` 中：
+## 更新与恢复
 
-- 首次安装：整个目录复制过去，目录名可改为 `MaiBot-SnowLuma-Adapter`。
-- 已有 SnowLuma 连接器：备份后，用输出目录中的文件覆盖原连接器代码，保留 `config.toml` 和运行数据。同一实例只保留一份连接器。
+同版本补装可以重跑快速开始命令。另一实例共用这份源码时，用 `--instance` 指定该实例。升级主程序前，准备与 MaiTogether 匹配的官方源码，按目标 Host 安装依赖。市场里的原版连接器会覆盖配套代码，更新连接器时请使用配套工具。
 
-继续使用原来的 SnowLuma 地址、端口和账号设置。无需另备一套干净的 MaiBot，也无需先装原版连接器再打补丁。主程序已经装过修改时，不要重复运行安装命令；升级方法见[更新与恢复](maintenance.md#更新与恢复)。
+安装器能直接识别本版配套连接器和对应提交的完整官方连接器。若实例装的是其他版本或有手动改动，先停机，将原连接器整个备份到插件目录之外，再运行安装命令。对照新版配置恢复账号、端口与所需数据。若提示有多份连接器，先按报出的路径核对实例中应保留哪一份。
 
-## 2. 选择插件
+安装中报错时工具会撤回本次已写入的文件。若因断电等原因中断，先停机，恢复安装前备份的主程序、连接器和实例配置，再启动。工具在发生修改的源码或实例旁留下 `*-maitogether-backup-*` 备份目录，其中 `restore.json` 记录原位置、修改项和新建项。只恢复本次改动时，将备份文件放回原位，移除清单中本次新增的文件。确认没有安装进程并完成恢复后，可删除遗留的空目录 `.maitogether-install.lock`。完整实例备份工具见[源码维护](maintenance.md#实例快照)。
 
-生活和静音组合使用 [MaiWeave](plugins/maiweave.md)、[MaiHush](plugins/maihush.md)、[MaiIdentity](plugins/maiidentity.md)。按各自页面设置作息、受管理群和管理员，其余从[插件清单](plugins.md)按需选择。
-
-插件仍使用自己的安装方式、WebUI 和配置文件。无需为每个插件重复安装 Host 修改或运行开发测试。
-
-## 3. 填写机器人账号和群号
-
-把输出目录中的 `behavior_control.example.json` 复制到 **Bot 实例的** `config/behavior_control.json`。将所有 `123456789` 替换为机器人自己的 QQ 号，将群聊项的 `987654321` 替换为群号：
-
-```json
-"account_id": "机器人自己的QQ号",
-"target_id": "要管理的群号"
-```
-
-示例还包含一项 `chat_type: "space"`，其中 `account_id` 和 `target_id` 都填机器人 QQ 号，用于 MaiWeave 空间发布。其他设置先保持示例值。管理多个群时，只复制 `chat_type: "group"` 的项并分别填写群号；MaiHush 里也添加这些群。文件是 JSON，不支持注释。
-
-实例目录就是这个 Bot 的 `config/`、`data/`、`plugins/` 所在目录。通过 `maibot run --directory ...` 启动时使用指定目录；直接从源码启动且未设置实例路径时，通常就是主程序目录。
-
-示例已包含[插件清单](plugins.md)中需要后台发送的插件，回复守卫除外，无需逐个添加。不安装或不开启对应插件功能，就不会因此产生动作；发送仍受睡眠和静音限制。
-
-启动 MaiBot 后，确认三个核心插件和 QQ 连接器已加载。在一个已配置的群里正常聊天，再用管理员账号发送 `/maihush mute 1m`，观察静音和恢复是否符合预期。
-
-没有这份配置时，统一发送检查默认关闭。**已经开启时，必要插件故障会阻止发送**，原因和处理方法见[常见问题](troubleshooting.md)。私聊、多账号和其他设置见[更多配置](configuration.md)。
+使用自定义 `MAIBOT_BEHAVIOR_CONFIG` 路径的部署，可用[离线导出](maintenance.md#从源码构建)，自行把配置放入实际使用的位置。
