@@ -54,20 +54,18 @@ def test_install_checks_then_applies_without_touching_configuration(official, tm
     assert (source / 'helper.py').stat().st_mode & 0o777 == (tmp_path / 'staged/helper.py').stat().st_mode & 0o777
     assert (source / 'config.toml').read_text() == 'private = "keep"\n'
     assert (backup / 'main.py').read_text() == 'value = 1\n'
-    with pytest.raises(ValueError, match='local changes'):
+    repeat = install.install(source, apply=True)
+    assert repeat['installed'] and not repeat['written']
+    (source / 'helper.py').write_text('custom = True\n')
+    with pytest.raises(ValueError, match='helper.py'):
         install.install(source, apply=True)
 
 
 def test_install_rolls_back_on_partial_write(official, tmp_path, monkeypatch):
     source, _ = official
-    replace = install.os.replace
-    calls = []
-    def fail_second(src, dest):
-        calls.append(dest)
-        if len(calls) == 2:
-            raise OSError('test disk failure')
-        replace(src, dest)
-    monkeypatch.setattr(install.os, 'replace', fail_second)
+    def fail_new_file(src, dest):
+        raise OSError('test disk failure')
+    monkeypatch.setattr(install.os, 'link', fail_new_file)
     with pytest.raises(OSError, match='disk failure'):
         install.install(source, apply=True, backup=tmp_path / 'backup')
     assert (source / 'main.py').read_text() == 'value = 1\n'
