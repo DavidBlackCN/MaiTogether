@@ -67,6 +67,10 @@ class AcceptanceProbe:
     @API('acceptance_delivery', public=False, version='1')
     async def acceptance_delivery(self, mode='space', stream_id='', suffix='one'):
         try:
+            if mode == 'image':
+                pixel = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC'
+                return await self.ctx.send.image(pixel, stream_id, return_details=True,
+                    storage_message=True, sync_to_maisaka_history=True)
             if mode == 'message':
                 return await self.ctx.send.text('isolated life sharing', stream_id,
                     return_details=True, storage_message=True, sync_to_maisaka_history=True)

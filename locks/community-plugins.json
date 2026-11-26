@@ -1,8 +1,8 @@
 {
   "MaiWeave": {
     "repository": "https://github.com/ilworkcn/MaiWeave",
-    "commit": "9f39457bab227f71ee74f1108aae36308864610e",
-    "version": "0.12.7"
+    "commit": "917f3615b3ea1b47e7a407c8b2a7c45a9dd5a408",
+    "version": "0.13.3"
   },
   "MaiWork": {
     "repository": "https://github.com/CharTyr/MaiWork",

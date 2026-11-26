@@ -83,7 +83,7 @@ async def run(work):
         from maiwork_native import configure
         configure(work, configs)
     if weave:
-        configs['maiweave'] = {'plugin': {'enabled': True, 'config_version': '0.12.7'},
+        configs['maiweave'] = {'plugin': {'enabled': True, 'config_version': '0.13.3'},
             'life': {'enabled': True, 'autonomous': False, 'model_task': 'test'},
             'world': {'weather_enabled': False, 'news_enabled': False, 'search_enabled': False, 'places_enabled': False},
             'proactive': {'enabled': False}, 'memory': {'enabled': False},

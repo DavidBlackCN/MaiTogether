@@ -75,6 +75,14 @@ async def run_cases(values):
         assert len(c.writes)==n+2
     c.cases.append('public_behavior_api_controls_actual_tools')
     assert (await c.call(WEAVE, 'acceptance_delivery', {'mode': 'message', 'stream_id': c.stream}))['sent'] is True
+    async def check_image(allowed):
+        before = len(c.writes)
+        result = await c.call(WEAVE, 'acceptance_delivery', {'mode': 'image', 'stream_id': c.stream})
+        assert bool(result.get('sent')) == allowed, result
+        assert len(c.writes) == before + int(allowed), c.writes[before:]
+        if allowed:
+            assert any(part['type'] == 'image' for part in c.writes[-1]['params']['message'])
+    await check_image(True)
     result = await publish('normal')
     assert result['status'] == '已发布', result
     c.faults['client'] = 'NapCat'
@@ -87,6 +95,7 @@ async def run_cases(values):
         del c.faults['client']
     c.cases.append('napcat_diary_cannot_read_account_cookies')
     await seed(kind='sleep'); n = len(c.writes)
+    await check_image(False)
     if os.environ.get('MAIWORK_TEST') == '1':
         from maiwork_native import check_paused_reply
         await check_paused_reply(c, '-803')
@@ -96,6 +105,8 @@ async def run_cases(values):
     assert len(c.writes) == n
     await seed()
     assert (await c.command('/maihush mute 5m'))[0]
+    await check_image(False)
+    c.cases.append('maiweave_sdk_image_delivered_awake_and_blocked_asleep_or_muted')
     if os.environ.get('MAIWORK_TEST') == '1':
         await check_paused_reply(c, '-804')
         c.cases.append('original_maiwork_reply_blocked_in_muted_group')
